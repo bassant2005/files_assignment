@@ -6,7 +6,7 @@
 #include <sstream>
 using namespace std;
 
-// ===================== FILE PATHS =====================
+//// ===================== FILE PATHS =====================
 // These are the files used for storing the main data and their index files.
 const string doctorDataFile = "Doctors.txt";
 const string appointmentDataFile = "Appointments.txt";
@@ -15,7 +15,7 @@ const string appointmentPrimaryIndexFile = "AppointmentPrimaryIndex.txt";
 const string doctorSecondaryIndexFile = "DoctorSecondaryIndex.txt";
 const string appointmentSecondaryIndexFile = "AppointmentSecondaryIndex.txt";
 
-// ===================== STRUCT DEFINITIONS =====================
+//// ===================== STRUCT DEFINITIONS =====================
 
 // Each record in the primary index stores (ID, RRN)
 // RRN = relative record number = record's order in the data file
@@ -40,7 +40,7 @@ struct SecondaryIndex {
     }
 };
 
-// ===================== HELPER FUNCTION =====================
+//// ===================== HELPER FUNCTION =====================
 // Splits a line of text into parts using the given delimiter ('|')
 vector<string> split(const string &line, char delim = '|') {
     vector<string> parts;
@@ -53,7 +53,7 @@ vector<string> split(const string &line, char delim = '|') {
     return parts;
 }
 
-// ===================== WRITE FUNCTIONS =====================
+//// ===================== WRITE FUNCTIONS =====================
 // Writes the primary index (ID|RRN) to a file
 void writePrimaryIndex(const vector<PrimaryIndex> &indexList, const string &fileName) {
     ofstream out(fileName);
@@ -70,7 +70,7 @@ void writeSecondaryIndex(const vector<SecondaryIndex> &indexList, const string &
     out.close();
 }
 
-// ===================== READ FUNCTIONS =====================
+//// ===================== READ FUNCTIONS =====================
 // Reads all records from a primary index file into memory
 vector<PrimaryIndex> readPrimaryIndex(const string &fileName) {
     vector<PrimaryIndex> indexList;
@@ -103,7 +103,7 @@ vector<SecondaryIndex> readSecondaryIndex(const string &fileName) {
     return indexList;
 }
 
-// ===================== INDEX BUILDING FUNCTIONS =====================
+//// ===================== INDEX BUILDING FUNCTIONS =====================
 
 // Builds the primary index for doctors
 // File format: X|DoctorID|DoctorName|DoctorAddress
