@@ -3,213 +3,223 @@
 #include <cstring>
 #include <vector>
 #include <algorithm>
+#include <sstream>
 using namespace std;
 
 // ===================== FILE PATHS =====================
-// File names for data and index files
-const string doctorFile = "Doctors.txt";
-const string appointmentFile = "Appointments.txt";
-const string doctorPrimaryFile = "DoctorPrimaryIndex.txt";
-const string appointmentPrimaryFile = "AppointmentPrimaryIndex.txt";
-const string doctorSecondaryFile = "DoctorSecondaryIndex.txt";
-const string appointmentSecondaryFile = "AppointmentSecondaryIndex.txt";
+// These are the files used for storing the main data and their index files.
+const string doctorDataFile = "Doctors.txt";
+const string appointmentDataFile = "Appointments.txt";
+const string doctorPrimaryIndexFile = "DoctorPrimaryIndex.txt";
+const string appointmentPrimaryIndexFile = "AppointmentPrimaryIndex.txt";
+const string doctorSecondaryIndexFile = "DoctorSecondaryIndex.txt";
+const string appointmentSecondaryIndexFile = "AppointmentSecondaryIndex.txt";
 
-// ===================== STRUCTS =====================
-// Doctor record
-struct Doctor {
-    char doctorID[10];
-    char doctorName[20];
-    char Address[30];
-};
+// ===================== STRUCT DEFINITIONS =====================
 
-// Appointment record
-struct Appointment {
-    char appointmentID[10];
-    char doctorID[10];
-    char appointmentDate[15];
-};
-
-// Primary index: links ID to record line number (RRN)
+// Each record in the primary index stores (ID, RRN)
+// RRN = relative record number = record's order in the data file
 struct PrimaryIndex {
-    char ID[10];
-    int RRN;
-    bool operator<(const PrimaryIndex &r) const {
-        return strcmp(ID, r.ID) < 0;
+    char recordID[10];  // e.g., DoctorID or AppointmentID
+    int recordRRN;      // record position (starts at 1)
+
+    bool operator<(const PrimaryIndex &other) const {
+        return strcmp(recordID, other.recordID) < 0;
     }
 };
 
-// Secondary index: links a secondary key (like name) to an ID
+// Each record in the secondary index stores (Key, ID)
+// e.g., (DoctorName, DoctorID)
 struct SecondaryIndex {
-    char key[20];
-    char ID[10];
-    bool operator<(const SecondaryIndex &r) const {
-        int cmp = strcmp(key, r.key);
-        return cmp == 0 ? strcmp(ID, r.ID) < 0 : cmp < 0;
+    char keyValue[20];  // secondary key (like doctor name)
+    char linkedID[10];  // ID of the related record
+
+    bool operator<(const SecondaryIndex &other) const {
+        int cmp = strcmp(keyValue, other.keyValue);
+        return cmp == 0 ? strcmp(linkedID, other.linkedID) < 0 : cmp < 0;
     }
 };
+
+// ===================== HELPER FUNCTION =====================
+// Splits a line of text into parts using the given delimiter ('|')
+vector<string> split(const string &line, char delim = '|') {
+    vector<string> parts;
+    stringstream ss(line);
+    string segment;
+
+    while (getline(ss, segment, delim))
+        parts.push_back(segment);
+
+    return parts;
+}
 
 // ===================== WRITE FUNCTIONS =====================
-// Save primary index to file
-void writePrimaryIndex(const vector<PrimaryIndex> &arr, const string &fileName) {
+// Writes the primary index (ID|RRN) to a file
+void writePrimaryIndex(const vector<PrimaryIndex> &indexList, const string &fileName) {
     ofstream out(fileName);
-    for (auto &p : arr)
-        out << p.ID << "|" << p.RRN << "\n";
+    for (auto &entry : indexList)
+        out << entry.recordID << "|" << entry.recordRRN << "\n";
     out.close();
 }
 
-// Save secondary index to file
-void writeSecondaryIndex(const vector<SecondaryIndex> &arr, const string &fileName) {
+// Writes the secondary index (Key|ID) to a file
+void writeSecondaryIndex(const vector<SecondaryIndex> &indexList, const string &fileName) {
     ofstream out(fileName);
-    for (auto &s : arr)
-        out << s.key << "|" << s.ID << "\n";
+    for (auto &entry : indexList)
+        out << entry.keyValue << "|" << entry.linkedID << "\n";
     out.close();
 }
 
 // ===================== READ FUNCTIONS =====================
-// Read primary index from file
+// Reads all records from a primary index file into memory
 vector<PrimaryIndex> readPrimaryIndex(const string &fileName) {
-    vector<PrimaryIndex> arr;
+    vector<PrimaryIndex> indexList;
     ifstream in(fileName);
-    PrimaryIndex p;
+    PrimaryIndex entry;
 
-    while (in >> p.ID) {
-        in.ignore(1, '|');
-        in >> p.RRN;
-        arr.push_back(p);
+    while (in >> entry.recordID) {
+        in.ignore(1, '|');  // skip the '|'
+        in >> entry.recordRRN;
+        indexList.push_back(entry);
     }
 
     in.close();
-    return arr;
+    return indexList;
 }
 
-// Read secondary index from file
+// Reads all records from a secondary index file into memory
 vector<SecondaryIndex> readSecondaryIndex(const string &fileName) {
-    vector<SecondaryIndex> arr;
+    vector<SecondaryIndex> indexList;
     ifstream in(fileName);
-    SecondaryIndex s;
+    SecondaryIndex entry;
 
-    while (in >> s.key) {
+    while (in >> entry.keyValue) {
         in.ignore(1, '|');
-        in >> s.ID;
-        arr.push_back(s);
+        in >> entry.linkedID;
+        indexList.push_back(entry);
     }
 
     in.close();
-    return arr;
+    return indexList;
 }
 
-// ===================== BUILD FUNCTIONS =====================
+// ===================== INDEX BUILDING FUNCTIONS =====================
 
-// Create primary index for doctors (by doctor ID)
+// Builds the primary index for doctors
+// File format: X|DoctorID|DoctorName|DoctorAddress
 vector<PrimaryIndex> buildDoctorPrimaryIndex() {
-    ifstream in(doctorFile);
-    vector<PrimaryIndex> index;
+    ifstream in(doctorDataFile);
+    vector<PrimaryIndex> doctorPrimaryIndex;
     string line;
-    int rrn = 0;
+    int rrn = 1; // first record is RRN=1
 
     while (getline(in, line)) {
         if (line.empty()) continue;
-        PrimaryIndex p;
-        string id = line.substr(0, line.find('|'));
-        strcpy(p.ID, id.c_str());
-        p.RRN = rrn++;
-        index.push_back(p);
+        auto fields = split(line);
+        if (fields.size() < 4) continue;
+
+        PrimaryIndex entry;
+        strcpy(entry.recordID, fields[1].c_str()); // DoctorID
+        entry.recordRRN = rrn++;
+        doctorPrimaryIndex.push_back(entry);
     }
 
     in.close();
-    sort(index.begin(), index.end());
-    writePrimaryIndex(index, doctorPrimaryFile);
-    return index;
+    sort(doctorPrimaryIndex.begin(), doctorPrimaryIndex.end());
+    writePrimaryIndex(doctorPrimaryIndex, doctorPrimaryIndexFile);
+
+    return doctorPrimaryIndex;
 }
 
-// Create primary index for appointments (by appointment ID)
+// Builds the primary index for appointments
+// File format: X|AppointmentID|DoctorID|AppointmentDate
 vector<PrimaryIndex> buildAppointmentPrimaryIndex() {
-    ifstream in(appointmentFile);
-    vector<PrimaryIndex> index;
+    ifstream in(appointmentDataFile);
+    vector<PrimaryIndex> appointmentPrimaryIndex;
     string line;
-    int rrn = 0;
+    int rrn = 1;
 
     while (getline(in, line)) {
         if (line.empty()) continue;
-        PrimaryIndex p;
-        string id = line.substr(0, line.find('|'));
-        strcpy(p.ID, id.c_str());
-        p.RRN = rrn++;
-        index.push_back(p);
+        auto fields = split(line);
+        if (fields.size() < 4) continue;
+
+        PrimaryIndex entry;
+        strcpy(entry.recordID, fields[1].c_str()); // AppointmentID
+        entry.recordRRN = rrn++;
+        appointmentPrimaryIndex.push_back(entry);
     }
 
     in.close();
-    sort(index.begin(), index.end());
-    writePrimaryIndex(index, appointmentPrimaryFile);
-    return index;
+    sort(appointmentPrimaryIndex.begin(), appointmentPrimaryIndex.end());
+    writePrimaryIndex(appointmentPrimaryIndex, appointmentPrimaryIndexFile);
+
+    return appointmentPrimaryIndex;
 }
 
-// Create secondary index for doctors (by doctor name)
+// Builds the secondary index for doctors (by name)
+// Each entry links DoctorName → DoctorID
 vector<SecondaryIndex> buildDoctorSecondaryIndex() {
-    ifstream in(doctorFile);
-    vector<SecondaryIndex> index;
+    ifstream in(doctorDataFile);
+    vector<SecondaryIndex> doctorSecondaryIndex;
     string line;
 
     while (getline(in, line)) {
         if (line.empty()) continue;
+        auto fields = split(line);
+        if (fields.size() < 4) continue;
 
-        size_t pos1 = line.find('|');
-        size_t pos2 = line.find('|', pos1 + 1);
-        string id = line.substr(0, pos1);
-        string name = line.substr(pos1 + 1, pos2 - pos1 - 1);
-
-        SecondaryIndex s;
-        strcpy(s.key, name.c_str());
-        strcpy(s.ID, id.c_str());
-        index.push_back(s);
+        SecondaryIndex entry;
+        strcpy(entry.keyValue, fields[2].c_str()); // DoctorName
+        strcpy(entry.linkedID, fields[1].c_str()); // DoctorID
+        doctorSecondaryIndex.push_back(entry);
     }
 
     in.close();
-    sort(index.begin(), index.end());
-    writeSecondaryIndex(index, doctorSecondaryFile);
-    return index;
+    sort(doctorSecondaryIndex.begin(), doctorSecondaryIndex.end());
+    writeSecondaryIndex(doctorSecondaryIndex, doctorSecondaryIndexFile);
+
+    return doctorSecondaryIndex;
 }
 
-// Create secondary index for appointments (by doctor ID)
+// Builds the secondary index for appointments (by DoctorID)
+// Each entry links DoctorID → AppointmentID
 vector<SecondaryIndex> buildAppointmentSecondaryIndex() {
-    ifstream in(appointmentFile);
-    vector<SecondaryIndex> index;
+    ifstream in(appointmentDataFile);
+    vector<SecondaryIndex> appointmentSecondaryIndex;
     string line;
 
     while (getline(in, line)) {
         if (line.empty()) continue;
+        auto fields = split(line);
+        if (fields.size() < 4) continue;
 
-        size_t pos1 = line.find('|');
-        size_t pos2 = line.find('|', pos1 + 1);
-        string appID = line.substr(0, pos1);
-        string docID = line.substr(pos1 + 1, pos2 - pos1 - 1);
-
-        SecondaryIndex s;
-        strcpy(s.key, docID.c_str());
-        strcpy(s.ID, appID.c_str());
-        index.push_back(s);
+        SecondaryIndex entry;
+        strcpy(entry.keyValue, fields[2].c_str()); // DoctorID
+        strcpy(entry.linkedID, fields[1].c_str()); // AppointmentID
+        appointmentSecondaryIndex.push_back(entry);
     }
 
     in.close();
-    sort(index.begin(), index.end());
-    writeSecondaryIndex(index, appointmentSecondaryFile);
-    return index;
+    sort(appointmentSecondaryIndex.begin(), appointmentSecondaryIndex.end());
+    writeSecondaryIndex(appointmentSecondaryIndex, appointmentSecondaryIndexFile);
+
+    return appointmentSecondaryIndex;
 }
 
-//make sure indexes are updated
-void updateIndexes(){
+// Builds all index files for both doctors and appointments
+void buildAllIndexes() {
     buildDoctorPrimaryIndex();
     buildAppointmentPrimaryIndex();
     buildDoctorSecondaryIndex();
     buildAppointmentSecondaryIndex();
 }
 
-// ===================== MAIN =====================
-int main() {
-    cout << "Building indexes...\n";
-
-    // Build and save all index files
-    updateIndexes ();
-
-    cout << "All indexes have been created successfully!\n";
-}
+//// ===================== MAIN FUNCTION =====================
+//int main() {
+//    cout << "🔄 Building all indexes...\n";
+//
+//    buildAllIndexes(); // Creates all four index files
+//
+//    cout << "✅ All indexes have been created and saved successfully!\n";
+//}

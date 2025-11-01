@@ -1,11 +1,8 @@
-Dr. Ahmed Hassan|D102
-Dr. Dina Yassin|D437
 Dr. Eman Sherif|D659
 Dr. Hany Tarek|D940
 Dr. Karim Nasser|D509
 Dr. Layla Samir|D613
 Dr. Mahmoud Saad|D548
-Dr. Mona Adel|D425
 Dr. Nour Magdy|D105
 Dr. Omar Khaled|D728
 Dr. Rania Ezzat|D216
