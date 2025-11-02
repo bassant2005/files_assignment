@@ -1,3 +1,12 @@
+/**
+ * ===============================================================
+ *  File created by: Bassant Tarek
+ *  Purpose: Implements the logic for building the indexed files
+ *           (both primary and secondary indexes) for the system.
+ *  Student ID: 20231023
+ * ===============================================================
+ */
+
 #include <iostream>
 #include <fstream>
 #include <cstring>
@@ -104,122 +113,72 @@ vector<SecondaryIndex> readSecondaryIndex(const string &fileName) {
 }
 
 //// ===================== INDEX BUILDING FUNCTIONS =====================
-
-// Builds the primary index for doctors
-// File format: X|DoctorID|DoctorName|DoctorAddress
-vector<PrimaryIndex> buildDoctorPrimaryIndex() {
-    ifstream in(doctorDataFile);
-    vector<PrimaryIndex> doctorPrimaryIndex;
-    string line;
-    int rrn = 1; // first record is RRN=1
-
-    while (getline(in, line)) {
-        if (line.empty()) continue;
-        auto fields = split(line);
-        if (fields.size() < 4) continue;
-
-        PrimaryIndex entry;
-        strcpy(entry.recordID, fields[1].c_str()); // DoctorID
-        entry.recordRRN = rrn++;
-        doctorPrimaryIndex.push_back(entry);
-    }
-
-    in.close();
-    sort(doctorPrimaryIndex.begin(), doctorPrimaryIndex.end());
-    writePrimaryIndex(doctorPrimaryIndex, doctorPrimaryIndexFile);
-
-    return doctorPrimaryIndex;
-}
-
-// Builds the primary index for appointments
-// File format: X|AppointmentID|DoctorID|AppointmentDate
-vector<PrimaryIndex> buildAppointmentPrimaryIndex() {
-    ifstream in(appointmentDataFile);
-    vector<PrimaryIndex> appointmentPrimaryIndex;
+// BUILD PRIMARY INDEX
+vector<PrimaryIndex> buildPrimaryIndex(const string &dataFile, const string &indexFile, int idFieldIndex) {
+    ifstream in(dataFile);
+    vector<PrimaryIndex> primaryIndex;
     string line;
     int rrn = 1;
 
+    // read each line (record) from the file
     while (getline(in, line)) {
         if (line.empty()) continue;
+
+        // split the record by delimiter (e.g., '|')
         auto fields = split(line);
-        if (fields.size() < 4) continue;
+        if (fields.size() <= idFieldIndex) continue;
 
         PrimaryIndex entry;
-        strcpy(entry.recordID, fields[1].c_str()); // AppointmentID
+        strcpy(entry.recordID, fields[idFieldIndex].c_str());
         entry.recordRRN = rrn++;
-        appointmentPrimaryIndex.push_back(entry);
+
+        primaryIndex.push_back(entry);
     }
 
     in.close();
-    sort(appointmentPrimaryIndex.begin(), appointmentPrimaryIndex.end());
-    writePrimaryIndex(appointmentPrimaryIndex, appointmentPrimaryIndexFile);
+    sort(primaryIndex.begin(), primaryIndex.end());
+    writePrimaryIndex(primaryIndex, indexFile);
 
-    return appointmentPrimaryIndex;
+    return primaryIndex;
 }
 
-// Builds the secondary index for doctors (by name)
-// Each entry links DoctorName → DoctorID
-vector<SecondaryIndex> buildDoctorSecondaryIndex() {
-    ifstream in(doctorDataFile);
-    vector<SecondaryIndex> doctorSecondaryIndex;
+// BUILD SECONDARY INDEX
+vector<SecondaryIndex> buildSecondaryIndex(const string &dataFile,const string &indexFile,int keyFieldIndex,int linkedFieldIndex) {
+    ifstream in(dataFile);
+    vector<SecondaryIndex> secondaryIndex;
     string line;
 
+    // read each record line by line
     while (getline(in, line)) {
         if (line.empty()) continue;
+
         auto fields = split(line);
-        if (fields.size() < 4) continue;
+        if (fields.size() <= max(keyFieldIndex, linkedFieldIndex)) continue;
 
         SecondaryIndex entry;
-        strcpy(entry.keyValue, fields[2].c_str()); // DoctorName
-        strcpy(entry.linkedID, fields[1].c_str()); // DoctorID
-        doctorSecondaryIndex.push_back(entry);
+        strcpy(entry.keyValue, fields[keyFieldIndex].c_str());
+        strcpy(entry.linkedID, fields[linkedFieldIndex].c_str());
+        secondaryIndex.push_back(entry);
     }
 
     in.close();
-    sort(doctorSecondaryIndex.begin(), doctorSecondaryIndex.end());
-    writeSecondaryIndex(doctorSecondaryIndex, doctorSecondaryIndexFile);
+    sort(secondaryIndex.begin(), secondaryIndex.end());
+    writeSecondaryIndex(secondaryIndex, indexFile);
 
-    return doctorSecondaryIndex;
-}
-
-// Builds the secondary index for appointments (by DoctorID)
-// Each entry links DoctorID → AppointmentID
-vector<SecondaryIndex> buildAppointmentSecondaryIndex() {
-    ifstream in(appointmentDataFile);
-    vector<SecondaryIndex> appointmentSecondaryIndex;
-    string line;
-
-    while (getline(in, line)) {
-        if (line.empty()) continue;
-        auto fields = split(line);
-        if (fields.size() < 4) continue;
-
-        SecondaryIndex entry;
-        strcpy(entry.keyValue, fields[2].c_str()); // DoctorID
-        strcpy(entry.linkedID, fields[1].c_str()); // AppointmentID
-        appointmentSecondaryIndex.push_back(entry);
-    }
-
-    in.close();
-    sort(appointmentSecondaryIndex.begin(), appointmentSecondaryIndex.end());
-    writeSecondaryIndex(appointmentSecondaryIndex, appointmentSecondaryIndexFile);
-
-    return appointmentSecondaryIndex;
+    return secondaryIndex;
 }
 
 // Builds all index files for both doctors and appointments
 void buildAllIndexes() {
-    buildDoctorPrimaryIndex();
-    buildAppointmentPrimaryIndex();
-    buildDoctorSecondaryIndex();
-    buildAppointmentSecondaryIndex();
+    buildPrimaryIndex(doctorDataFile, doctorPrimaryIndexFile, 1);
+    buildPrimaryIndex(appointmentDataFile, appointmentPrimaryIndexFile, 1);
+    buildSecondaryIndex(doctorDataFile,doctorSecondaryIndexFile,2,1);
+    buildSecondaryIndex(appointmentDataFile,appointmentSecondaryIndexFile,2,1);
 }
 
 //// ===================== MAIN FUNCTION =====================
-//int main() {
-//    cout << "🔄 Building all indexes...\n";
-//
-//    buildAllIndexes(); // Creates all four index files
-//
-//    cout << "✅ All indexes have been created and saved successfully!\n";
-//}
+int main() {
+    cout << "🔄 Building all indexes...\n";
+    buildAllIndexes(); // Creates all four index files
+    cout << "✅ All indexes have been created and saved successfully!\n";
+}

@@ -1,12 +1,15 @@
-20|D214|Dr. Sara Mahmoud|Giza
-20|D317|Dr. Youssef Ali|Alexandria
-20|D509|Dr. Karim Nasser|Aswan
-20|D613|Dr. Layla Samir|Luxor
-20|D728|Dr. Omar Khaled|Mansoura
-20|D832|Dr. Salma Hany|Zagazig
-20|D940|Dr. Hany Tarek|Suez
-20|D105|Dr. Nour Magdy|Port Said
-20|D216|Dr. Rania Ezzat|Fayoum
-20|D329|Dr. Tamer Fathy|Ismailia
-20|D548|Dr. Mahmoud Saad|Qena
-20|D659|Dr. Eman Sherif|Sohag
+29|D214|Dr. Ahmed Fathy|Cairo
+32|D352|Dr. Mona Hassan|Alexandria
+34|D417|Dr. Youssef Adel|Giza
+33|D298|Dr. Sara Mahmoud|Mansoura
+29|D189|Dr. Laila Kamal|Cairo
+30|D512|Dr. Omar Tarek|Ismailia
+31|D433|Dr. Mariam Nabil|Giza
+31|D276|Dr. Hossam Rashed|Cairo
+32|D391|Dr. Rana Mohamed|Tanta
+30|D468|Dr. Karim Hany|Alexandria
+29|D304|Dr. Dina Saeed|Cairo
+31|D582|Dr. Nour El-Din|Giza
+31|D341|Dr. Salma Khaled|Zagazig
+29|D265|Dr. Walid Samir|Cairo
+28|D198|Dr. Heba Ezzat|Aswan

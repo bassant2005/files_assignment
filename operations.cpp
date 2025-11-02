@@ -541,38 +541,38 @@ void manageAppointments(
     } while(choice != 'B' && choice != 'b');
 }
 
-// -------------------- main --------------------
-int main() {
-    // Ensure data files exist (create if missing)
-    { ofstream out(DOCTOR_FILE, ios::app); }
-    { ofstream out(APPT_FILE, ios::app); }
-
-    // load indices (if exist)
-    vector<PrimaryIndex> doctorPrimary = loadPrimaryIndexFile(DOCTOR_PRIMARY_FILE);
-    vector<SecondaryIndex> doctorSecondary = loadSecondaryIndexFile(DOCTOR_SECONDARY_FILE);
-    vector<PrimaryIndex> apptPrimary = loadPrimaryIndexFile(APPT_PRIMARY_FILE);
-    vector<SecondaryIndex> apptSecondary = loadSecondaryIndexFile(APPT_SECONDARY_FILE);
-
-    // avail lists (start empty). If you need persistent avail lists, add files for them and load/save similarly.
-    vector<int> doctorAvail;
-    vector<int> apptAvail;
-
-    char mainChoice;
-    do {
-        cout << "\n=== Main Menu ===\n";
-        cout << "1. Manage Doctors\n";
-        cout << "2. Manage Appointments\n";
-        cout << "E. Exit\n";
-        cout << "Choose: ";
-        cin >> mainChoice;
-
-        if(mainChoice == '1') {
-            manageDoctors(doctorPrimary, doctorSecondary, doctorAvail, apptPrimary, apptSecondary, apptAvail);
-        } else if(mainChoice == '2') {
-            manageAppointments(apptPrimary, apptSecondary, apptAvail);
-        }
-    } while(mainChoice != 'E' && mainChoice != 'e');
-
-    cout << "Goodbye\n";
-    return 0;
-}
+//// -------------------- main --------------------
+//int main() {
+//    // Ensure data files exist (create if missing)
+//    { ofstream out(DOCTOR_FILE, ios::app); }
+//    { ofstream out(APPT_FILE, ios::app); }
+//
+//    // load indices (if exist)
+//    vector<PrimaryIndex> doctorPrimary = loadPrimaryIndexFile(DOCTOR_PRIMARY_FILE);
+//    vector<SecondaryIndex> doctorSecondary = loadSecondaryIndexFile(DOCTOR_SECONDARY_FILE);
+//    vector<PrimaryIndex> apptPrimary = loadPrimaryIndexFile(APPT_PRIMARY_FILE);
+//    vector<SecondaryIndex> apptSecondary = loadSecondaryIndexFile(APPT_SECONDARY_FILE);
+//
+//    // avail lists (start empty). If you need persistent avail lists, add files for them and load/save similarly.
+//    vector<int> doctorAvail;
+//    vector<int> apptAvail;
+//
+//    char mainChoice;
+//    do {
+//        cout << "\n=== Main Menu ===\n";
+//        cout << "1. Manage Doctors\n";
+//        cout << "2. Manage Appointments\n";
+//        cout << "E. Exit\n";
+//        cout << "Choose: ";
+//        cin >> mainChoice;
+//
+//        if(mainChoice == '1') {
+//            manageDoctors(doctorPrimary, doctorSecondary, doctorAvail, apptPrimary, apptSecondary, apptAvail);
+//        } else if(mainChoice == '2') {
+//            manageAppointments(apptPrimary, apptSecondary, apptAvail);
+//        }
+//    } while(mainChoice != 'E' && mainChoice != 'e');
+//
+//    cout << "Goodbye\n";
+//    return 0;
+//}
