@@ -84,11 +84,25 @@ void writeSecondaryIndex(const vector<SecondaryIndex> &indexList, const string &
 vector<PrimaryIndex> readPrimaryIndex(const string &fileName) {
     vector<PrimaryIndex> indexList;
     ifstream in(fileName);
-    PrimaryIndex entry;
+    string line;
 
-    while (in >> entry.recordID) {
-        in.ignore(1, '|');  // skip the '|'
-        in >> entry.recordRRN;
+    if (!in.is_open()) {
+        cout << "DEBUG: Could not open " << fileName << " for reading\n";
+        return indexList;
+    }
+
+    while (getline(in, line)) {
+        if (line.empty()) continue;
+
+        size_t pos = line.find('|');
+        if (pos == string::npos) continue;
+
+        PrimaryIndex entry;
+        string id = line.substr(0, pos);
+        string rrnStr = line.substr(pos + 1);
+
+        strcpy(entry.recordID, id.c_str());
+        entry.recordRRN = stoi(rrnStr);
         indexList.push_back(entry);
     }
 
@@ -96,15 +110,30 @@ vector<PrimaryIndex> readPrimaryIndex(const string &fileName) {
     return indexList;
 }
 
+
 // Reads all records from a secondary index file into memory
 vector<SecondaryIndex> readSecondaryIndex(const string &fileName) {
     vector<SecondaryIndex> indexList;
     ifstream in(fileName);
-    SecondaryIndex entry;
+    string line;
 
-    while (in >> entry.keyValue) {
-        in.ignore(1, '|');
-        in >> entry.linkedID;
+    if (!in.is_open()) {
+        cout << "DEBUG: Could not open " << fileName << " for reading\n";
+        return indexList;
+    }
+
+    while (getline(in, line)) {
+        if (line.empty()) continue;
+
+        size_t pos = line.find('|');
+        if (pos == string::npos) continue;
+
+        SecondaryIndex entry;
+        string key = line.substr(0, pos);
+        string id = line.substr(pos + 1);
+
+        strcpy(entry.keyValue, key.c_str());
+        strcpy(entry.linkedID, id.c_str());
         indexList.push_back(entry);
     }
 
@@ -118,7 +147,7 @@ vector<PrimaryIndex> buildPrimaryIndex(const string &dataFile, const string &ind
     ifstream in(dataFile);
     vector<PrimaryIndex> primaryIndex;
     string line;
-    int rrn = 1;
+    int rrn = 0;
 
     // read each line (record) from the file
     while (getline(in, line)) {
@@ -170,15 +199,10 @@ vector<SecondaryIndex> buildSecondaryIndex(const string &dataFile,const string &
 
 // Builds all index files for both doctors and appointments
 void buildAllIndexes() {
-    buildPrimaryIndex(doctorDataFile, doctorPrimaryIndexFile, 1);
-    buildPrimaryIndex(appointmentDataFile, appointmentPrimaryIndexFile, 1);
-    buildSecondaryIndex(doctorDataFile,doctorSecondaryIndexFile,2,1);
-    buildSecondaryIndex(appointmentDataFile,appointmentSecondaryIndexFile,2,1);
+    buildPrimaryIndex(doctorDataFile, doctorPrimaryIndexFile, 2);
+    buildPrimaryIndex(appointmentDataFile, appointmentPrimaryIndexFile, 0);
+    buildSecondaryIndex(doctorDataFile,doctorSecondaryIndexFile,0,2);
+    buildSecondaryIndex(appointmentDataFile,appointmentSecondaryIndexFile,1,0);
 }
 
 //// ===================== MAIN FUNCTION =====================
-int main() {
-    cout << "🔄 Building all indexes...\n";
-    buildAllIndexes(); // Creates all four index files
-    cout << "✅ All indexes have been created and saved successfully!\n";
-}
