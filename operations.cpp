@@ -433,7 +433,7 @@ bool addDoctor(vector<PrimaryIndex> &primary,vector<SecondaryIndex> &secondary,v
 }
 
 // ---------- Add New Appointment ----------
-bool addAppointment(vector<PrimaryIndex> &primary,vector<SecondaryIndex> &secondary,vector<int> &avail) {
+bool addAppointment(vector<PrimaryIndex> &primary,vector<SecondaryIndex> &secondary,vector<int> &avail, const vector<PrimaryIndex> &doctorPrimary) {
     Appointment a;
     cout << "Enter Appointment ID: "; cin >> a.ID;
     cout << "Enter Doctor ID: "; cin >> a.DoctorID;
@@ -443,6 +443,20 @@ bool addAppointment(vector<PrimaryIndex> &primary,vector<SecondaryIndex> &second
     if (getRRNByID(primary, a.ID) != -1) {
         cout << "Appointment already exists.\n";
         return false;
+    }
+
+    // Validate DoctorID exists and not deleted
+    int drrn = getRRNByID(doctorPrimary, a.DoctorID);
+    if (drrn == -1) {
+        cout << "Doctor does not exist. Cannot add appointment.\n";
+        return false;
+    }
+    {
+        vector<string> dlines = readAllLines(doctorDataFile);
+        if (drrn < 0 || drrn >= (int)dlines.size() || dlines[drrn].empty() || dlines[drrn][0] == DELETE_FLAG) {
+            cout << "Doctor record is deleted or invalid. Cannot add appointment.\n";
+            return false;
+        }
     }
 
     vector<string> lines = readAllLines(appointmentDataFile);
@@ -534,7 +548,7 @@ bool updateDoctor(vector<PrimaryIndex> &primary,vector<SecondaryIndex> &secondar
 
 
 // ---------- Update Existing Appointment ----------
-bool updateAppointment(vector<PrimaryIndex> &primary,vector<SecondaryIndex> &secondary) {
+bool updateAppointment(vector<PrimaryIndex> &primary,vector<SecondaryIndex> &secondary, const vector<PrimaryIndex> &doctorPrimary) {
     char id[15];
     cout << "Enter Appointment ID to update: "; cin >> id;
     int rrn = getRRNByID(primary, id);
@@ -548,6 +562,20 @@ bool updateAppointment(vector<PrimaryIndex> &primary,vector<SecondaryIndex> &sec
     cout << "Current: " << a;
     cout << "Enter new DoctorID: "; cin >> a.DoctorID;
     cout << "Enter new Date: "; cin >> a.Date;
+
+    // Validate new DoctorID
+    int drrn = getRRNByID(doctorPrimary, a.DoctorID);
+    if (drrn == -1) {
+        cout << "Doctor does not exist. Update aborted.\n";
+        return false;
+    }
+    {
+        vector<string> dlines = readAllLines(doctorDataFile);
+        if (drrn < 0 || drrn >= (int)dlines.size() || dlines[drrn].empty() || dlines[drrn][0] == DELETE_FLAG) {
+            cout << "Doctor record is deleted or invalid. Update aborted.\n";
+            return false;
+        }
+    }
 
     lines[rrn] = a.toLine();
     writeAllLines(appointmentDataFile, lines);
@@ -565,214 +593,4 @@ bool updateAppointment(vector<PrimaryIndex> &primary,vector<SecondaryIndex> &sec
 }
 
 
-//// ===================== MENU FUNCTIONS =====================
-void manageDoctors(vector<PrimaryIndex> &primary,
-                   vector<SecondaryIndex> &secondary,
-                   vector<int> &avail,
-                   vector<PrimaryIndex> &apptPrimary,
-                   vector<SecondaryIndex> &apptSecondary,
-                   vector<int> &apptAvail) {
-    char choice;
-    do {
-        cout << "\n--- Manage Doctors ---\n";
-        cout << "I: Insert  U: Update  V: View by RRN  D: Delete by ID  S: Search by ID  N: Search by Name  A: Print Avail  P: Search Appointments  B: Back\n";
-        cout << "Choose: ";
-        cin >> choice;
-
-        if (choice == 'I' || choice == 'i') {
-            bool success = addDoctor(primary, secondary, avail);
-            cout << (success ? "Doctor inserted successfully\n" : "Doctor insertion failed\n");
-        }else if (choice == 'V' || choice == 'v') {
-            int r; cout << "Enter RRN: "; cin >> r;
-            vector<string> lines = readAllLines(doctorDataFile);
-            if (r < 0 || r >= lines.size()) {
-                cout << "Invalid RRN\n";
-            } else if (lines[r].empty()) {
-                cout << "Empty record\n";
-            } else {
-                Doctor d = Doctor::fromLine(lines[r]);
-                cout << d;
-            }
-        } else if (choice == 'D' || choice == 'd') {
-            char id[15]; cout << "Enter ID to delete: "; cin >> id;
-            bool ok = deleteDoctorByID(id, primary, secondary, avail, apptPrimary, apptSecondary, apptAvail);
-            cout << (ok ? "Deleted\n" : "Not found or already deleted\n");
-        } else if (choice == 'S' || choice == 's') {
-            char id[15]; cout << "Enter ID: "; cin >> id;
-            int rrn = getRRNByID(primary, id);
-            if (rrn == -1) {
-                cout << "ID not found\n";
-            } else {
-                vector<string> lines = readAllLines(doctorDataFile);
-                if (rrn < lines.size() && !lines[rrn].empty()) {
-                    Doctor d = Doctor::fromLine(lines[rrn]);
-                    cout << d;
-                } else {
-                    cout << "Deleted or not present in file\n";
-                }
-            }
-        } else if (choice == 'N' || choice == 'n') {
-            char name[30];
-            cout << "Enter Name (exact): ";
-            cin >> ws;
-            cin.getline(name, 30);
-            vector<string> ids = getAllIDsByKey(secondary, name);
-            if (ids.empty()) {
-                cout << "No records with that name\n";
-            } else {
-                vector<string> lines = readAllLines(doctorDataFile);
-                for (auto &id : ids) {
-                    int rrn = getRRNByID(primary, id.c_str());
-                    if (rrn != -1 && rrn < lines.size() && !lines[rrn].empty()) {
-                        Doctor d = Doctor::fromLine(lines[rrn]);
-                        if (!d.isEmpty()) {
-                            cout << d;
-                        }
-                    }
-                }
-            }
-        }else if (choice == 'U' || choice == 'u') {
-            updateDoctor(primary, secondary);
-        }
-        else if (choice == 'A' || choice == 'a') {
-            printAvail(avail);
-        } else if (choice == 'P' || choice == 'p') {
-            char doctorID[15]; cout << "Enter Doctor ID to search appointments: "; cin >> doctorID;
-            vector<Appointment> appointments = searchAppointmentsByDoctorID(doctorID, apptPrimary, apptSecondary);
-            if (appointments.empty()) {
-                cout << "No appointments found for doctor " << doctorID << endl;
-            } else {
-                cout << "Found " << appointments.size() << " appointment(s) for doctor " << doctorID << ":\n";
-                for (const auto &appt : appointments) {
-                    cout << appt;
-                }
-            }
-        }
-
-    } while (choice != 'B' && choice != 'b');
-}
-
-void manageAppointments(vector<PrimaryIndex> &primary,
-                        vector<SecondaryIndex> &secondary,
-                        vector<int> &avail) {
-    char choice;
-    do {
-        cout << "\n--- Manage Appointments ---\n";
-        cout << "I: Insert  U: Update  V: View by RRN  D: Delete by ID  S: Search by ID  N: Search by Name  A: Print Avail B: Back\n";
-        cout << "Choose: ";
-        cin >> choice;
-
-        if (choice == 'I' || choice == 'i') {
-            bool success = addAppointment(primary, secondary, avail);
-            cout << (success ? "Inserted successfully\n" : "Insertion failed\n");
-        }else if (choice == 'V' || choice == 'v') {
-            int r; cout << "Enter RRN: "; cin >> r;
-            vector<string> lines = readAllLines(appointmentDataFile);
-            if (r < 0 || r >= lines.size()) {
-                cout << "Invalid RRN\n";
-            } else if (lines[r].empty()) {
-                cout << "Empty record\n";
-            } else {
-                Appointment a = Appointment::fromLine(lines[r]);
-                cout << a;
-            }
-        } else if (choice == 'D' || choice == 'd') {
-            char id[15]; cout << "Enter Appointment ID to delete: "; cin >> id;
-            bool ok = deleteAppointmentByID(id, primary, secondary, avail);
-            cout << (ok ? "Deleted\n" : "Not found or already deleted\n");
-        } else if (choice == 'S' || choice == 's') {
-            char id[15]; cout << "Enter Appointment ID: "; cin >> id;
-            int rrn = getRRNByID(primary, id);
-            if (rrn == -1) {
-                cout << "ID not found\n";
-            } else {
-                vector<string> lines = readAllLines(appointmentDataFile);
-                if (rrn < lines.size() && !lines[rrn].empty()) {
-                    Appointment a = Appointment::fromLine(lines[rrn]);
-                    cout << a;
-                } else {
-                    cout << "Deleted or not present in file\n";
-                }
-            }
-        } else if (choice == 'N' || choice == 'n') {
-            char docid[15];
-            cout << "Enter DoctorID: ";
-            cin >> ws;
-            cin.getline(docid, 15);
-            vector<string> ids = getAllIDsByKey(secondary, docid);
-            if (ids.empty()) {
-                cout << "No appointments for that doctor\n";
-            } else {
-                vector<string> lines = readAllLines(appointmentDataFile);
-                for (auto &id: ids) {
-                    int rrn = getRRNByID(primary, id.c_str());
-                    if (rrn != -1 && rrn < lines.size() && !lines[rrn].empty()) {
-                        Appointment a = Appointment::fromLine(lines[rrn]);
-                        if (!a.isEmpty()) {
-                            cout << a;
-                        }
-                    }
-                }
-            }
-        }else if (choice == 'U' || choice == 'u') {
-                updateAppointment(primary, secondary);
-            }
-        else if (choice == 'A' || choice == 'a') {
-            printAvail(avail);
-        }
-
-    } while (choice != 'B' && choice != 'b');
-}
-
-//// ===================== MAIN FUNCTION =====================
-int main() {
-    ofstream doctorFile(doctorDataFile, ios::app);
-    ofstream appointmentFile(appointmentDataFile, ios::app);
-    doctorFile.close();
-    appointmentFile.close();
-
-    cout << "=== Loading Index Files ===\n";
-
-    vector<PrimaryIndex> doctorPrimary = readPrimaryIndex(doctorPrimaryIndexFile);
-    vector<SecondaryIndex> doctorSecondary = readSecondaryIndex(doctorSecondaryIndexFile);
-    vector<PrimaryIndex> apptPrimary = readPrimaryIndex(appointmentPrimaryIndexFile);
-    vector<SecondaryIndex> apptSecondary = readSecondaryIndex(appointmentSecondaryIndexFile);
-
-    vector<int> doctorAvail;
-    vector<int> apptAvail;
-
-    char mainChoice;
-    do {
-        cout << "\n=== Main Menu ===\n";
-        cout << "1. Manage Doctors\n";
-        cout << "2. Manage Appointments\n";
-        cout << "3. Build/Rebuild All Indexes\n";
-        cout << "E. Exit\n";
-        cout << "Choose: ";
-        cin >> mainChoice;
-
-        if (mainChoice == '1') {
-            manageDoctors(doctorPrimary, doctorSecondary, doctorAvail,
-                          apptPrimary, apptSecondary, apptAvail);
-        }
-        else if (mainChoice == '2') {
-            manageAppointments(apptPrimary, apptSecondary, apptAvail);
-        }
-        else if (mainChoice == '3') {
-            cout << "Building all indexes..."<<endl;
-            buildAllIndexes();
-            // Reload indexes
-            doctorPrimary = readPrimaryIndex(doctorPrimaryIndexFile);
-            doctorSecondary = readSecondaryIndex(doctorSecondaryIndexFile);
-            apptPrimary = readPrimaryIndex(appointmentPrimaryIndexFile);
-            apptSecondary = readSecondaryIndex(appointmentSecondaryIndexFile);
-            cout << "All indexes have been created and saved successfully!"<<endl;
-
-        }
-
-    } while (mainChoice != 'E' && mainChoice != 'e');
-
-    cout << "Goodbye\n";
-    return 0;
-}
 

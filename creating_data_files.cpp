@@ -204,5 +204,3 @@ void buildAllIndexes() {
     buildSecondaryIndex(doctorDataFile,doctorSecondaryIndexFile,0,2);
     buildSecondaryIndex(appointmentDataFile,appointmentSecondaryIndexFile,1,0);
 }
-
-//// ===================== MAIN FUNCTION =====================

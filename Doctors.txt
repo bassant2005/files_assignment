@@ -1,15 +1,1 @@
-29|D214|Dr. Ahmed Fathy|Cairo
-32|D352|Dr. Mona Hassan|Alexandria
-34|D417|Dr. Youssef Adel|Giza
-33|D298|Dr. Sara Mahmoud|Mansoura
-29|D189|Dr. Laila Kamal|Cairo
-30|D512|Dr. Omar Tarek|Ismailia
-31|D433|Dr. Mariam Nabil|Giza
-31|D276|Dr. Hossam Rashed|Cairo
-32|D391|Dr. Rana Mohamed|Tanta
-30|D468|Dr. Karim Hany|Alexandria
-29|D304|Dr. Dina Saeed|Cairo
-31|D582|Dr. Nour El-Din|Giza
-31|D341|Dr. Salma Khaled|Zagazig
-29|D265|Dr. Walid Samir|Cairo
-28|D198|Dr. Heba Ezzat|Aswan
+
