@@ -1,3 +1,11 @@
+/**
+ * ===============================================================
+ *  File created by: Rawda Raafat
+ *  Purpose: Implements the main menu and query execution
+ *           for Doctors and Appointments operations.
+ *  Student ID: 20231067
+ * ===============================================================
+ */
 #include "operations.cpp"
 #include <iostream>
 #include <string>
@@ -18,15 +26,6 @@ static string toLower(string s){
     return s;
 }
 
-static string unquote(const string &s){
-    string v = trim(s);
-    if(!v.empty() && v.front()=='\''){
-        if(v.size()>=2 && v.back()=='\'') return v.substr(1, v.size()-2);
-        return v.substr(1);
-    }
-    return v;
-}
-
 // Simple query executor for three supported forms
 static void executeQuery(const string &query,
                          vector<PrimaryIndex> &doctorPrimary,
@@ -35,142 +34,87 @@ static void executeQuery(const string &query,
                          vector<SecondaryIndex> &apptSecondary){
     string q = trim(query);
     if(q.empty()){
-        cout << "Empty query\n"; return;
+        cout << "Empty query\n";
+        return;
     }
+
+    // Remove trailing semicolon if present
     if(!q.empty() && q.back()==';') q.pop_back();
 
-    // Case-insensitive parse using positions from lower-cased string
     string lq = toLower(q);
-    size_t selPos = lq.find("select ");
-    size_t fromPos = lq.find(" from ");
-    size_t wherePos = lq.find(" where ");
-    if(selPos!=0 || fromPos==string::npos || wherePos==string::npos || fromPos<=7 || wherePos<=fromPos+6){
-        cout << "Invalid query\n"; return;
-    }
 
-    string selectPart = trim(q.substr(7, fromPos-7));
-    string tablePart  = trim(q.substr(fromPos+6, wherePos-(fromPos+6)));
-    string condPart   = trim(q.substr(wherePos+7));
+    // 1) Select all from Doctors where Doctor ID='xxx'
+    if(lq.rfind("select all from doctors where doctor id=", 0) == 0){
+        size_t pos = lq.find("=");
+        if(pos==string::npos){ cout << "Invalid query\n"; return; }
+        string value = trim(q.substr(pos+1));
+        if(!value.empty() && value.front()=='\'') value.erase(0,1);
+        if(!value.empty() && value.back()=='\'') value.pop_back();
 
-    string lSelect = toLower(selectPart);
-    string lTable  = toLower(tablePart);
-    string lCond   = toLower(condPart);
-
-    // condition must be: <field>=<value>
-    size_t eqPos = lCond.find('=');
-    if(eqPos==string::npos){ cout << "Invalid condition\n"; return; }
-    string whereField = trim(condPart.substr(0, eqPos));
-    string whereValue = unquote(condPart.substr(eqPos+1));
-    string lWhereField = toLower(whereField);
-
-    bool selectAll = (lSelect=="all" || lSelect=="*");
-
-    // Mapping helpers
-    auto printDoctorField = [](const Doctor &d, const string &lField){
-        if(lField=="doctor id") cout << d.ID << "\n";
-        else if(lField=="doctor name") cout << d.Name << "\n";
-        else if(lField=="doctor specialty") cout << d.Specialty << "\n";
-    };
-    auto printAppointmentField = [](const Appointment &a, const string &lField){
-        if(lField=="appointment id") cout << a.ID << "\n";
-        else if(lField=="doctor id") cout << a.DoctorID << "\n";
-        else if(lField=="date") cout << a.Date << "\n";
-    };
-
-    if(lTable=="doctors"){
+        int rrn = getRRNByID(doctorPrimary, value.c_str());
+        if(rrn == -1){ cout << "ID not found\n"; return; }
         vector<string> lines = readAllLines(doctorDataFile);
-
-        if(lWhereField=="doctor id"){
-            int rrn = getRRNByID(doctorPrimary, whereValue.c_str());
-            if(rrn==-1){ cout << "ID not found\n"; return; }
-            if(rrn >=0 && rrn < (int)lines.size() && !lines[rrn].empty() && lines[rrn][0] != DELETE_FLAG){
-                Doctor d = Doctor::fromLine(lines[rrn]);
-                if(selectAll) cout << d; else printDoctorField(d, toLower(selectPart));
-            } else cout << "Deleted or not present in file\n";
-            return;
+        if(rrn >= 0 && rrn < (int)lines.size() && !lines[rrn].empty() && lines[rrn][0] != DELETE_FLAG){
+            Doctor d = Doctor::fromLine(lines[rrn]);
+            cout << d;
+        } else {
+            cout << "Deleted or not present in file\n";
         }
-        else if(lWhereField=="doctor name"){
-            vector<string> ids = getAllIDsByKey(doctorSecondary, whereValue.c_str());
-            if(ids.empty()){ cout << "No records with that name\n"; return; }
-            for(const auto &id : ids){
-                int rrn = getRRNByID(doctorPrimary, id.c_str());
-                if(rrn!=-1 && rrn<(int)lines.size() && !lines[rrn].empty() && lines[rrn][0] != DELETE_FLAG){
-                    Doctor d = Doctor::fromLine(lines[rrn]);
-                    if(selectAll) cout << d; else printDoctorField(d, toLower(selectPart));
-                }
-            }
-            return;
-        }
-        else if(lWhereField=="doctor specialty"){
-            // No index on Specialty: scan file
-            int hits=0;
-            for(int rrn=0; rrn<(int)lines.size(); ++rrn){
-                if(lines[rrn].empty() || lines[rrn][0]==DELETE_FLAG) continue;
-                auto fields = split(lines[rrn]);
-                if(fields.size()>=3 && fields[1]==whereValue){
-                    Doctor d = Doctor::fromLine(lines[rrn]);
-                    if(selectAll) cout << d; else printDoctorField(d, toLower(selectPart));
-                    hits++;
-                }
-            }
-            if(hits==0) cout << "No records match\n";
-            return;
-        }
-        else{
-            cout << "Unsupported Doctors field\n"; return;
-        }
+        return;
     }
-    else if(lTable=="appointments"){
+
+    // 2) Select all from Appointments where Doctor ID='xxx'
+    if(lq.rfind("select all from appointments where doctor id=", 0) == 0){
+        size_t pos = lq.find("=");
+        if(pos==string::npos){ cout << "Invalid query\n"; return; }
+        string value = trim(q.substr(pos+1));
+        if(!value.empty() && value.front()=='\'') value.erase(0,1);
+        if(!value.empty() && value.back()=='\'') value.pop_back();
+
+        vector<string> apptIDs = getAllIDsByKey(apptSecondary, value.c_str());
+        if(apptIDs.empty()){
+            cout << "No appointments for that doctor\n"; return;
+        }
         vector<string> lines = readAllLines(appointmentDataFile);
-
-        if(lWhereField=="appointment id"){
-            int rrn = getRRNByID(apptPrimary, whereValue.c_str());
-            if(rrn==-1){ cout << "ID not found\n"; return; }
-            if(rrn>=0 && rrn<(int)lines.size() && !lines[rrn].empty() && lines[rrn][0] != DELETE_FLAG){
+        int count=0;
+        for(const auto &aid : apptIDs){
+            int rrn = getRRNByID(apptPrimary, aid.c_str());
+            if(rrn!=-1 && rrn < (int)lines.size() && !lines[rrn].empty() && lines[rrn][0] != DELETE_FLAG){
                 Appointment a = Appointment::fromLine(lines[rrn]);
-                if(selectAll) cout << a; else printAppointmentField(a, toLower(selectPart));
-            } else cout << "Deleted or not present in file\n";
-            return;
-        }
-        else if(lWhereField=="doctor id"){
-            vector<string> apptIDs = getAllIDsByKey(apptSecondary, whereValue.c_str());
-            if(apptIDs.empty()){ cout << "No appointments for that doctor\n"; return; }
-            int count=0;
-            for(const auto &aid : apptIDs){
-                int rrn = getRRNByID(apptPrimary, aid.c_str());
-                if(rrn!=-1 && rrn<(int)lines.size() && !lines[rrn].empty() && lines[rrn][0] != DELETE_FLAG){
-                    Appointment a = Appointment::fromLine(lines[rrn]);
-                    if(selectAll) cout << a; else printAppointmentField(a, toLower(selectPart));
+                if(!a.isEmpty()){
+                    cout << a;
                     count++;
                 }
             }
-            if(count==0) cout << "No appointments found (records may be deleted)\n";
-            return;
         }
-        else if(lWhereField=="date"){
-            // No index on Date: scan file
-            int count=0;
-            for(int rrn=0; rrn<(int)lines.size(); ++rrn){
-                if(lines[rrn].empty() || lines[rrn][0]==DELETE_FLAG) continue;
-                auto fields = split(lines[rrn]);
-                if(fields.size()>=3 && fields[2]==whereValue){
-                    Appointment a = Appointment::fromLine(lines[rrn]);
-                    if(selectAll) cout << a; else printAppointmentField(a, toLower(selectPart));
-                    count++;
-                }
-            }
-            if(count==0) cout << "No appointments match\n";
-            return;
-        }
-        else{
-            cout << "Unsupported Appointments field\n"; return;
-        }
+        if(count==0) cout << "No appointments found (records may be deleted)\n";
+        return;
     }
-    else{
-        cout << "Unsupported table\n"; return;
-    }
-}
 
+    // 3) Select Doctor Name from Doctors where Doctor Name='xxx'
+    if(lq.rfind("select doctor name from doctors where doctor name=", 0) == 0){
+        size_t pos = lq.find("=");
+        if(pos==string::npos){ cout << "Invalid query\n"; return; }
+        string value = trim(q.substr(pos+1));
+        if(!value.empty() && value.front()=='\'') value.erase(0,1);
+        if(!value.empty() && value.back()=='\'') value.pop_back();
+
+        vector<string> ids = getAllIDsByKey(doctorSecondary, value.c_str());
+        if(ids.empty()){ cout << "No records with that name\n"; return; }
+        vector<string> lines = readAllLines(doctorDataFile);
+        for(const auto &id : ids){
+            int rrn = getRRNByID(doctorPrimary, id.c_str());
+            if(rrn!=-1 && rrn < (int)lines.size() && !lines[rrn].empty() && lines[rrn][0] != DELETE_FLAG){
+                Doctor d = Doctor::fromLine(lines[rrn]);
+                if(!d.isEmpty()) cout << d.Name << "\n";
+            }
+        }
+        return;
+    }
+
+    cout << "Unsupported query.\n";
+}
+//// ===================== Main Menu =====================
 int main(){
     ofstream doctorFile(doctorDataFile, ios::app); doctorFile.close();
     ofstream appointmentFile(appointmentDataFile, ios::app); appointmentFile.close();
@@ -246,7 +190,6 @@ int main(){
             cout << "Invalid choice\n";
         }
     }
-
     cout << "Goodbye\n";
     return 0;
 }

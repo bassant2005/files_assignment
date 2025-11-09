@@ -10,6 +10,15 @@
 using namespace std;
 
 const char DELETE_FLAG = '*';
+/**
+ * ===============================================================
+ *  GENERAL Struct for Doctor and Appointment & GENERAL DELETE & SEARCH functions
+ *  created by: Habeba Hosam
+ *  Purpose: Implements the logic for deleting & searching
+ *           functions for both Doctor & Appointment.
+ *  Student ID: 20230117
+ * ===============================================================
+ */
 
 // Safe copy helper: prevents buffer overflow
 void safe_strcpy(char* dest, const char* src, size_t size) {
@@ -591,6 +600,3 @@ bool updateAppointment(vector<PrimaryIndex> &primary,vector<SecondaryIndex> &sec
     cout << "Appointment updated successfully.\n";
     return true;
 }
-
-
-
