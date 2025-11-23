@@ -48,20 +48,22 @@ struct Doctor {
     static Doctor fromLine(const string &line) {
         if (line.empty()) return Doctor();
 
-        // Handle deleted records
         bool isDeleted = (line[0] == DELETE_FLAG);
         string content = isDeleted ? line.substr(1) : line;
-        if (content.empty()) return Doctor();
 
         auto fields = split(content);
-        if (fields.size() < 3) return Doctor();
 
-        return Doctor(fields[0].c_str(), fields[1].c_str(), fields[2].c_str());
+        if (fields.size() < 4) return Doctor();
+
+        return Doctor(fields[1].c_str(), fields[2].c_str(), fields[3].c_str());
     }
+
 
     string toLine() const {
-        return string(Name) + "|" + string(Specialty) + "|" + string(ID);
+        string data = string(Name) + "|" + string(Specialty) + "|" + string(ID);
+        return to_string(data.length()) + "|" + data;
     }
+
 
     bool isEmpty() const {
         return strlen(Name) == 0 && strlen(Specialty) == 0 && strlen(ID) == 0;
@@ -101,17 +103,18 @@ struct Appointment {
         // Handle deleted records
         bool isDeleted = (line[0] == DELETE_FLAG);
         string content = isDeleted ? line.substr(1) : line;
-        if (content.empty()) return Appointment();
 
         auto fields = split(content);
-        if (fields.size() < 3) return Appointment();
+        if (fields.size() < 4) return Appointment();
 
-        return Appointment(fields[0].c_str(), fields[1].c_str(), fields[2].c_str());
+        return Appointment(fields[1].c_str(), fields[2].c_str(), fields[3].c_str());
     }
 
     string toLine() const {
-        return string(ID) + "|" + string(DoctorID) + "|" + string(Date);
+        string data = string(ID) + "|" + string(DoctorID) + "|" + string(Date);
+        return to_string(data.length()) + "|" + data;
     }
+
 
     bool isEmpty() const {
         return strlen(ID) == 0 && strlen(DoctorID) == 0 && strlen(Date) == 0;
