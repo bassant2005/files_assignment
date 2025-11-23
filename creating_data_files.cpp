@@ -199,8 +199,8 @@ vector<SecondaryIndex> buildSecondaryIndex(const string &dataFile,const string &
 
 // Builds all index files for both doctors and appointments
 void buildAllIndexes() {
-    buildPrimaryIndex(doctorDataFile, doctorPrimaryIndexFile, 2);
-    buildPrimaryIndex(appointmentDataFile, appointmentPrimaryIndexFile, 0);
-    buildSecondaryIndex(doctorDataFile,doctorSecondaryIndexFile,0,2);
-    buildSecondaryIndex(appointmentDataFile,appointmentSecondaryIndexFile,1,0);
+    buildPrimaryIndex(doctorDataFile, doctorPrimaryIndexFile, 3);
+    buildPrimaryIndex(appointmentDataFile, appointmentPrimaryIndexFile, 1);
+    buildSecondaryIndex(doctorDataFile,doctorSecondaryIndexFile,1,3);
+    buildSecondaryIndex(appointmentDataFile,appointmentSecondaryIndexFile,2,1);
 }
