@@ -6,7 +6,7 @@
  *  Student ID: 20231067
  * ===============================================================
  */
-#include "opperations.cpp"
+#include "operations.cpp"
 #include <iostream>
 #include <string>
 #include <algorithm>
@@ -115,81 +115,81 @@ static void executeQuery(const string &query,
     cout << "Unsupported query.\n";
 }
 //// ===================== Main Menu =====================
-int main(){
-    ofstream doctorFile(doctorDataFile, ios::app); doctorFile.close();
-    ofstream appointmentFile(appointmentDataFile, ios::app); appointmentFile.close();
-
-    vector<PrimaryIndex> doctorPrimary = readPrimaryIndex(doctorPrimaryIndexFile);
-    vector<SecondaryIndex> doctorSecondary = readSecondaryIndex(doctorSecondaryIndexFile);
-    vector<PrimaryIndex> apptPrimary = readPrimaryIndex(appointmentPrimaryIndexFile);
-    vector<SecondaryIndex> apptSecondary = readSecondaryIndex(appointmentSecondaryIndexFile);
-
-    vector<int> doctorAvail;
-    vector<int> apptAvail;
-
-    while(true){
-        cout << "\n=== Main Menu ===\n";
-        cout << "1. Add New Doctor\n";
-        cout << "2. Add New Appointment\n";
-        cout << "3. Update Doctor Name (Doctor ID)\n";
-        cout << "4. Update Appointment Date (Appointment ID)\n";
-        cout << "5. Delete Appointment (Appointment ID)\n";
-        cout << "6. Delete Doctor (Doctor ID)\n";
-        cout << "7. Print Doctor Info (Doctor ID)\n";
-        cout << "8. Print Appointment Info (Appointment ID)\n";
-        cout << "9. Write Query\n";
-        cout << "E. Exit\n";
-        cout << "Choose: ";
-        string choice; cin >> choice;
-
-        if(choice == "1"){
-            addDoctor(doctorPrimary, doctorSecondary, doctorAvail);
-        } else if(choice == "2"){
-            addAppointment(apptPrimary, apptSecondary, apptAvail, doctorPrimary);
-        } else if(choice == "3"){
-            updateDoctor(doctorPrimary, doctorSecondary);
-        } else if(choice == "4"){
-            updateAppointment(apptPrimary, apptSecondary, doctorPrimary);
-        } else if(choice == "5"){
-            char id[15]; cout << "Enter Appointment ID to delete: "; cin >> id;
-            bool ok = deleteAppointmentByID(id, apptPrimary, apptSecondary, apptAvail);
-            cout << (ok ? "Deleted\n" : "Not found or already deleted\n");
-        } else if(choice == "6"){
-            char id[15]; cout << "Enter Doctor ID to delete: "; cin >> id;
-            bool ok = deleteDoctorByID(id, doctorPrimary, doctorSecondary, doctorAvail,
-                                       apptPrimary, apptSecondary, apptAvail);
-            cout << (ok ? "Deleted\n" : "Not found or already deleted\n");
-        } else if(choice == "7"){
-            char id[15]; cout << "Enter Doctor ID: "; cin >> id;
-            int rrn = getRRNByID(doctorPrimary, id);
-            if(rrn==-1){ cout << "ID not found\n"; }
-            else{
-                vector<string> lines = readAllLines(doctorDataFile);
-                if(rrn < (int)lines.size() && !lines[rrn].empty() && lines[rrn][0] != DELETE_FLAG){
-                    Doctor d = Doctor::fromLine(lines[rrn]); cout << d;
-                } else { cout << "Deleted or not present in file\n"; }
-            }
-        } else if(choice == "8"){
-            char id[15]; cout << "Enter Appointment ID: "; cin >> id;
-            int rrn = getRRNByID(apptPrimary, id);
-            if(rrn==-1){ cout << "ID not found\n"; }
-            else{
-                vector<string> lines = readAllLines(appointmentDataFile);
-                if(rrn < (int)lines.size() && !lines[rrn].empty() && lines[rrn][0] != DELETE_FLAG){
-                    Appointment a = Appointment::fromLine(lines[rrn]); cout << a;
-                } else { cout << "Deleted or not present in file\n"; }
-            }
-        } else if(choice == "9"){
-            cout << "Enter query: ";
-            cin.ignore(numeric_limits<streamsize>::max(), '\n');
-            string q; getline(cin, q);
-            executeQuery(q, doctorPrimary, doctorSecondary, apptPrimary, apptSecondary);
-        } else if(choice == "E" || choice == "e"){
-            break;
-        } else {
-            cout << "Invalid choice\n";
-        }
-    }
-    cout << "Goodbye\n";
-    return 0;
-}
+//int main(){
+//    ofstream doctorFile(doctorDataFile, ios::app); doctorFile.close();
+//    ofstream appointmentFile(appointmentDataFile, ios::app); appointmentFile.close();
+//
+//    vector<PrimaryIndex> doctorPrimary = readPrimaryIndex(doctorPrimaryIndexFile);
+//    vector<SecondaryIndex> doctorSecondary = readSecondaryIndex(doctorSecondaryIndexFile);
+//    vector<PrimaryIndex> apptPrimary = readPrimaryIndex(appointmentPrimaryIndexFile);
+//    vector<SecondaryIndex> apptSecondary = readSecondaryIndex(appointmentSecondaryIndexFile);
+//
+//    vector<int> doctorAvail;
+//    vector<int> apptAvail;
+//
+//    while(true){
+//        cout << "\n=== Main Menu ===\n";
+//        cout << "1. Add New Doctor\n";
+//        cout << "2. Add New Appointment\n";
+//        cout << "3. Update Doctor Name (Doctor ID)\n";
+//        cout << "4. Update Appointment Date (Appointment ID)\n";
+//        cout << "5. Delete Appointment (Appointment ID)\n";
+//        cout << "6. Delete Doctor (Doctor ID)\n";
+//        cout << "7. Print Doctor Info (Doctor ID)\n";
+//        cout << "8. Print Appointment Info (Appointment ID)\n";
+//        cout << "9. Write Query\n";
+//        cout << "E. Exit\n";
+//        cout << "Choose: ";
+//        string choice; cin >> choice;
+//
+//        if(choice == "1"){
+//            addDoctor(doctorPrimary, doctorSecondary, doctorAvail);
+//        } else if(choice == "2"){
+//            addAppointment(apptPrimary, apptSecondary, apptAvail, doctorPrimary);
+//        } else if(choice == "3"){
+//            updateDoctor(doctorPrimary, doctorSecondary);
+//        } else if(choice == "4"){
+//            updateAppointment(apptPrimary, apptSecondary, doctorPrimary);
+//        } else if(choice == "5"){
+//            char id[15]; cout << "Enter Appointment ID to delete: "; cin >> id;
+//            bool ok = deleteAppointmentByID(id, apptPrimary, apptSecondary, apptAvail);
+//            cout << (ok ? "Deleted\n" : "Not found or already deleted\n");
+//        } else if(choice == "6"){
+//            char id[15]; cout << "Enter Doctor ID to delete: "; cin >> id;
+//            bool ok = deleteDoctorByID(id, doctorPrimary, doctorSecondary, doctorAvail,
+//                                       apptPrimary, apptSecondary, apptAvail);
+//            cout << (ok ? "Deleted\n" : "Not found or already deleted\n");
+//        } else if(choice == "7"){
+//            char id[15]; cout << "Enter Doctor ID: "; cin >> id;
+//            int rrn = getRRNByID(doctorPrimary, id);
+//            if(rrn==-1){ cout << "ID not found\n"; }
+//            else{
+//                vector<string> lines = readAllLines(doctorDataFile);
+//                if(rrn < (int)lines.size() && !lines[rrn].empty() && lines[rrn][0] != DELETE_FLAG){
+//                    Doctor d = Doctor::fromLine(lines[rrn]); cout << d;
+//                } else { cout << "Deleted or not present in file\n"; }
+//            }
+//        } else if(choice == "8"){
+//            char id[15]; cout << "Enter Appointment ID: "; cin >> id;
+//            int rrn = getRRNByID(apptPrimary, id);
+//            if(rrn==-1){ cout << "ID not found\n"; }
+//            else{
+//                vector<string> lines = readAllLines(appointmentDataFile);
+//                if(rrn < (int)lines.size() && !lines[rrn].empty() && lines[rrn][0] != DELETE_FLAG){
+//                    Appointment a = Appointment::fromLine(lines[rrn]); cout << a;
+//                } else { cout << "Deleted or not present in file\n"; }
+//            }
+//        } else if(choice == "9"){
+//            cout << "Enter query: ";
+//            cin.ignore(numeric_limits<streamsize>::max(), '\n');
+//            string q; getline(cin, q);
+//            executeQuery(q, doctorPrimary, doctorSecondary, apptPrimary, apptSecondary);
+//        } else if(choice == "E" || choice == "e"){
+//            break;
+//        } else {
+//            cout << "Invalid choice\n";
+//        }
+//    }
+//    cout << "Goodbye\n";
+//    return 0;
+//}

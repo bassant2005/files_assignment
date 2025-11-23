@@ -1,4 +1,3 @@
-
 #include "creating_data_files.cpp"
 #include <iostream>
 #include <fstream>
@@ -140,7 +139,7 @@ int getRRNByID(const vector<PrimaryIndex> &primaryIndex, const char *id) {
         int cmp = strcmp(id, primaryIndex[mid].recordID);
 
         if (cmp == 0) {
-            return primaryIndex[mid].recordRRN;
+            return primaryIndex[mid].recordLength;
         } else if (cmp < 0) {
             right = mid - 1;
         } else {
@@ -427,7 +426,7 @@ bool addDoctor(vector<PrimaryIndex> &primary,vector<SecondaryIndex> &secondary,v
     // Update primary index
     PrimaryIndex p;
     safe_strcpy(p.recordID, d.ID, sizeof(p.recordID));
-    p.recordRRN = rrn;
+    p.recordLength = rrn;
     primary.push_back(p);
     sort(primary.begin(), primary.end());
     writePrimaryIndex(primary, doctorPrimaryIndexFile);
@@ -492,7 +491,7 @@ bool addAppointment(vector<PrimaryIndex> &primary,vector<SecondaryIndex> &second
     // Update indices
     PrimaryIndex p;
     safe_strcpy(p.recordID, a.ID, sizeof(p.recordID));
-    p.recordRRN = rrn;
+    p.recordLength = rrn;
     primary.push_back(p);
     sort(primary.begin(), primary.end());
     writePrimaryIndex(primary, appointmentPrimaryIndexFile);
