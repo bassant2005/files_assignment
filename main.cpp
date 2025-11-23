@@ -6,7 +6,7 @@
  *  Student ID: 20231067
  * ===============================================================
  */
-#include "operations.cpp"
+#include "opperations.cpp"
 #include <iostream>
 #include <string>
 #include <algorithm>
