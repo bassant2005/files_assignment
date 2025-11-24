@@ -25,20 +25,18 @@ const string doctorSecondaryIndexFile = "DoctorSecondaryIndex.txt";
 const string appointmentSecondaryIndexFile = "AppointmentSecondaryIndex.txt";
 
 //// ===================== STRUCT DEFINITIONS =====================
-
-// Each record in the primary index stores (ID, RRN)
-// RRN = relative record number = record's order in the data file
+// Each record in the primary index stores (ID, offset)
 struct PrimaryIndex {
-    char recordID[10];  // e.g., DoctorID or AppointmentID
-    int recordLength;      // record position (starts at 1)
+    char recordID[20];
+    int offset;
+    int recordLength;
 
-    bool operator<(const PrimaryIndex &other) const {
+    bool operator <(const PrimaryIndex& other) const {
         return strcmp(recordID, other.recordID) < 0;
     }
 };
 
 // Each record in the secondary index stores (Key, ID)
-// e.g., (DoctorName, DoctorID)
 struct SecondaryIndex {
     char keyValue[20];  // secondary key (like doctor ID)
     char linkedID[10];  // ID of the related record
@@ -66,8 +64,9 @@ vector<string> split(const string &line, char delim = '|') {
 // Writes the primary index (ID|RRN) to a file
 void writePrimaryIndex(const vector<PrimaryIndex> &indexList, const string &fileName) {
     ofstream out(fileName);
-    for (auto &entry : indexList)
-        out << entry.recordID << "|" << entry.recordLength << "\n";
+    for (const auto &entry : indexList) {
+        out << entry.recordID << "|" << entry.offset << "\n";
+    }
     out.close();
 }
 
@@ -86,11 +85,6 @@ vector<PrimaryIndex> readPrimaryIndex(const string &fileName) {
     ifstream in(fileName);
     string line;
 
-    if (!in.is_open()) {
-        cout << "DEBUG: Could not open " << fileName << " for reading\n";
-        return indexList;
-    }
-
     while (getline(in, line)) {
         if (line.empty()) continue;
 
@@ -98,18 +92,19 @@ vector<PrimaryIndex> readPrimaryIndex(const string &fileName) {
         if (pos == string::npos) continue;
 
         PrimaryIndex entry;
-        string id = line.substr(0, pos);
-        string rrnStr = line.substr(pos + 1);
 
-        strcpy(entry.recordID, id.c_str());
-        entry.recordLength = stoi(rrnStr);
+        // recordID
+        strcpy(entry.recordID, line.substr(0, pos).c_str());
+
+        // offset
+        entry.offset = stoll(line.substr(pos + 1));
+
         indexList.push_back(entry);
     }
 
     in.close();
     return indexList;
 }
-
 
 // Reads all records from a secondary index file into memory
 vector<SecondaryIndex> readSecondaryIndex(const string &fileName) {
@@ -143,10 +138,14 @@ vector<SecondaryIndex> readSecondaryIndex(const string &fileName) {
 
 //// ===================== INDEX BUILDING FUNCTIONS =====================
 // BUILD PRIMARY INDEX
-vector<PrimaryIndex> buildPrimaryIndexLength(const string &dataFile, const string &indexFile, int idFieldIndex) {
+vector<PrimaryIndex> buildPrimaryIndexLength(const string &dataFile,
+                                             const string &indexFile,
+                                             int idFieldIndex) {
     ifstream in(dataFile);
     vector<PrimaryIndex> primaryIndex;
     string line;
+
+    long long currentOffset = 0;   // start at byte 0
 
     while (getline(in, line)) {
         if (line.empty()) continue;
@@ -157,15 +156,23 @@ vector<PrimaryIndex> buildPrimaryIndexLength(const string &dataFile, const strin
         PrimaryIndex entry;
         strcpy(entry.recordID, fields[idFieldIndex].c_str());
 
-        // Directly take length from the first column
-        entry.recordLength = stoi(fields[0]);
+        // Set offset for this record
+        entry.offset = currentOffset;
+
+        // Calculate record length: line chars + newline
+        entry.recordLength = line.length() + 1;
+
+        // Update offset for next record
+        currentOffset += entry.recordLength;
 
         primaryIndex.push_back(entry);
     }
 
     in.close();
+
     sort(primaryIndex.begin(), primaryIndex.end());
     writePrimaryIndex(primaryIndex, indexFile);
+
     return primaryIndex;
 }
 
@@ -195,14 +202,26 @@ vector<SecondaryIndex> buildSecondaryIndex(const string &dataFile,const string &
     return secondaryIndex;
 }
 
+/**
+ * YOU CAN USE THIS TO REBUILD ALL THE INDEXES WHEN
+ * NEEDED AFTER ANY UPDATES IN THE DATA FILES
+ * */
+
+void Build_indexes(){
+    auto doctorPrimary = buildPrimaryIndexLength(doctorDataFile, doctorPrimaryIndexFile, 3);
+    auto doctorSecondary = buildSecondaryIndex(doctorDataFile, doctorSecondaryIndexFile, 1, 3);
+    auto appointmentPrimary = buildPrimaryIndexLength(appointmentDataFile, appointmentPrimaryIndexFile, 1);
+    auto appointmentSecondary = buildSecondaryIndex(appointmentDataFile, appointmentSecondaryIndexFile, 2, 1);
+}
+
 int main() {
     cout << "=== Building indexes for Doctors.txt ===\n";
     auto doctorPrimary = buildPrimaryIndexLength(doctorDataFile, doctorPrimaryIndexFile, 3); // DoctorID
     auto doctorSecondary = buildSecondaryIndex(doctorDataFile, doctorSecondaryIndexFile, 1, 3); // Name -> ID
 
-    cout << "Doctor Primary Index (ID | RecordLength):\n";
+    cout << "Doctor Primary Index (ID | Offset):\n";
     for (auto &d : doctorPrimary)
-        cout << d.recordID << " | " << d.recordLength << "\n";
+        cout << d.recordID << " | " << d.offset<< "\n";
 
     cout << "\nDoctor Secondary Index (Name -> ID):\n";
     for (auto &d : doctorSecondary)
@@ -212,17 +231,23 @@ int main() {
     auto appointmentPrimary = buildPrimaryIndexLength(appointmentDataFile, appointmentPrimaryIndexFile, 1); // AppointmentID
     auto appointmentSecondary = buildSecondaryIndex(appointmentDataFile, appointmentSecondaryIndexFile, 2, 1); // DoctorID -> AppointmentID
 
-    cout << "Appointment Primary Index (ID | RecordLength):\n";
+    cout << "Appointment Primary Index (ID | Offset):\n";
     for (auto &a : appointmentPrimary)
-        cout << a.recordID << " | " << a.recordLength << "\n";
+        cout << a.recordID << " | " << a.offset << "\n";
 
     cout << "\nAppointment Secondary Index (DoctorID -> AppointmentID):\n";
     for (auto &a : appointmentSecondary)
         cout << a.keyValue << " | " << a.linkedID << "\n";
 
-    // Test reading back from index files
+    // Test reading back from indexes files
+    cout << "\n=== Read indexes ===\n";
     auto doctorPrimaryRead = readPrimaryIndex(doctorPrimaryIndexFile);
     cout << "\nRead back Doctor Primary Index:\n";
     for (auto &d : doctorPrimaryRead)
-        cout << d.recordID << " | " << d.recordLength << "\n";
+        cout << d.recordID << " | " << d.offset << "\n";
+
+    auto doctorSecondaryRead = readSecondaryIndex(doctorSecondaryIndexFile);
+    cout << "\nRead back Doctor Secondary Index:\n";
+    for (auto &d : doctorSecondaryRead)
+        cout << d.keyValue << " | " << d.linkedID << "\n";
 }

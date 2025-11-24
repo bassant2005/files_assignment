@@ -9,21 +9,6 @@
 using namespace std;
 
 const char DELETE_FLAG = '*';
-/**
- * YOU CAN USE THIS TO REBUILD ALL THE INDEXES WHEN
- * NEEDED AFTER ANY UPDATES IN THE DATA FILES
- * */
-
-void Build_indexes(){
-    cout << "=== Building indexes for Doctors.txt ===\n";
-    auto doctorPrimary = buildPrimaryIndexLength(doctorDataFile, doctorPrimaryIndexFile, 3); // DoctorID
-    auto doctorSecondary = buildSecondaryIndex(doctorDataFile, doctorSecondaryIndexFile, 1, 3); // Name -> ID
-
-
-    cout << "\n=== Building indexes for Appointments.txt ===\n";
-    auto appointmentPrimary = buildPrimaryIndexLength(appointmentDataFile, appointmentPrimaryIndexFile, 1); // AppointmentID
-    auto appointmentSecondary = buildSecondaryIndex(appointmentDataFile, appointmentSecondaryIndexFile, 2, 1); // DoctorID -> AppointmentID
-}
 
 /**
  * ===============================================================
