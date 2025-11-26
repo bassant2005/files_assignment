@@ -61,6 +61,8 @@ static void executeQuery(const string &query,
         string line = readLineAtOffset(doctorDataFile, off);
         if(!line.empty() && line[0] != DELETE_FLAG){
             Doctor d = Doctor::fromLine(line);
+
+
             cout << d;
         } else {
             cout << "Deleted or not present in file\n";
@@ -74,10 +76,13 @@ static void executeQuery(const string &query,
         if(pos==string::npos){ cout << "Invalid query\n"; return; }
         string value = stripQuotes(q.substr(pos+1));
 
+
+
         vector<string> apptIDs = getAllIDsByKey(apptSecondary, value.c_str());
         if(apptIDs.empty()){
             cout << "No appointments for that doctor\n"; return;
         }
+
         int count=0;
         for(const auto &aid : apptIDs){
             long long off = getOffsetByID(apptPrimary, aid.c_str());
@@ -102,8 +107,11 @@ static void executeQuery(const string &query,
         if(pos==string::npos){ cout << "Invalid query\n"; return; }
         string value = stripQuotes(q.substr(pos+1));
 
+
+
         vector<string> ids = getAllIDsByKey(doctorSecondary, value.c_str());
         if(ids.empty()){ cout << "No records with that name\n"; return; }
+
         for(const auto &id : ids){
             long long off = resolveActiveOffsetForID(doctorPrimary, doctorDataFile, id.c_str());
             if(off != -1){

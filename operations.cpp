@@ -247,6 +247,7 @@ vector<string> readAllLines(const string &fileName) {
     }
     in.close();
 
+
     return lines;
 }
 
@@ -261,6 +262,8 @@ void writeAllLines(const string &fileName, const vector<string> &lines) {
         out << line << "\n";
     }
     out.close();
+
+
 }
 
 // Map an offset back to line index (RRN) by cumulative lengths
@@ -300,6 +303,8 @@ vector<Appointment> searchAppointmentsByDoctorID(const char *doctorID,
 
     if (apptIDs.empty()) return appointments;
 
+
+
     for (auto &apptID : apptIDs) {
         long long off = getOffsetByID(apptPrimary, apptID.c_str());
         if (off != -1) {
@@ -338,6 +343,23 @@ bool deleteAppointmentByID(const char *id,
     Build_indexes();
     primary = readPrimaryIndex(appointmentPrimaryIndexFile);
     secondary = readSecondaryIndex(appointmentSecondaryIndexFile);
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
     return true;
 }
 
@@ -405,6 +427,21 @@ bool deleteDoctorByID(const char *id,
     secondary = readSecondaryIndex(doctorSecondaryIndexFile);
     apptPrimary = readPrimaryIndex(appointmentPrimaryIndexFile);
     apptSecondary = readSecondaryIndex(appointmentSecondaryIndexFile);
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
     return true;
 }
 
@@ -565,6 +602,7 @@ bool updateDoctor(vector<PrimaryIndex> &primary,vector<SecondaryIndex> &secondar
         cout << "Doctor not found.\n";
         return false;
     }
+
     vector<string> lines = readAllLines(doctorDataFile);
     int rrn = rrnFromOffset(lines, off);
     if (rrn == -1 || lines[rrn].empty() || lines[rrn][0] == DELETE_FLAG) {
@@ -650,4 +688,3 @@ bool updateAppointment(vector<PrimaryIndex> &primary,vector<SecondaryIndex> &sec
     cout << "Appointment updated successfully.\n";
     return true;
 }
-
