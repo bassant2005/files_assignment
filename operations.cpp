@@ -27,7 +27,6 @@ void safe_strcpy(char* dest, const char* src, size_t size) {
     dest[size - 1] = '\0';
 }
 
-
 // -------------------- Doctor struct --------------------
 struct Doctor {
     char ID[15];
@@ -116,7 +115,6 @@ struct Appointment {
         return to_string(data.length()) + "|" + data;
     }
 
-
     bool isEmpty() const {
         return strlen(ID) == 0 && strlen(DoctorID) == 0 && strlen(Date) == 0;
     }
@@ -130,8 +128,6 @@ struct Appointment {
         return os;
     }
 };
-
-
 
 static string readLineAtOffset(const string &fileName, long long offset) {
     ifstream in(fileName, ios::binary);
@@ -247,7 +243,6 @@ vector<string> readAllLines(const string &fileName) {
     }
     in.close();
 
-
     return lines;
 }
 
@@ -262,8 +257,6 @@ void writeAllLines(const string &fileName, const vector<string> &lines) {
         out << line << "\n";
     }
     out.close();
-
-
 }
 
 // Map an offset back to line index (RRN) by cumulative lengths
@@ -344,22 +337,6 @@ bool deleteAppointmentByID(const char *id,
     primary = readPrimaryIndex(appointmentPrimaryIndexFile);
     secondary = readSecondaryIndex(appointmentSecondaryIndexFile);
 
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
     return true;
 }
 
@@ -394,7 +371,6 @@ bool deleteAllAppointmentsForDoctor(const char *doctorID,
 }
 
 //// ===================== DOCTOR OPERATIONS =====================
-
 bool deleteDoctorByID(const char *id,
                       vector<PrimaryIndex> &primary,
                       vector<SecondaryIndex> &secondary,
@@ -427,20 +403,6 @@ bool deleteDoctorByID(const char *id,
     secondary = readSecondaryIndex(doctorSecondaryIndexFile);
     apptPrimary = readPrimaryIndex(appointmentPrimaryIndexFile);
     apptSecondary = readSecondaryIndex(appointmentSecondaryIndexFile);
-
-
-
-
-
-
-
-
-
-
-
-
-
-
 
     return true;
 }
@@ -639,8 +601,6 @@ bool updateDoctor(vector<PrimaryIndex> &primary,vector<SecondaryIndex> &secondar
     cout << "Doctor updated successfully.\n";
     return true;
 }
-
-
 
 // ---------- Update Existing Appointment ----------
 bool updateAppointment(vector<PrimaryIndex> &primary,vector<SecondaryIndex> &secondary, const vector<PrimaryIndex> &doctorPrimary) {

@@ -1,5 +1,7 @@
-9|Alice|Cardiology|D01
-11|Carol|Neurology|D03
+
+*11|Carol|Neurology|D03
+*10|Bob|Pediatrics|D05
 10|Bob|Pediatrics|D02
-12|David|Orthopedics|D06
+12|David|Orthopedics|D02
 11|asd|fgh|123
+9|Alice|Cardiology|D01

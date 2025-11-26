@@ -1,5 +1,6 @@
 Alice|D01
 Bob|D02
-Carol|D03
-David|D06
+Bob|*D05
+Carol|*D03
+David|D02
 asd|123
