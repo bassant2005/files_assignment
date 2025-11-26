@@ -20,6 +20,7 @@ const char DELETE_FLAG = '*';
  * ===============================================================
  */
 
+
 // Safe copy helper: prevents buffer overflow
 void safe_strcpy(char* dest, const char* src, size_t size) {
     strncpy(dest, src, size - 1);
@@ -130,7 +131,32 @@ struct Appointment {
     }
 };
 
-//// ===================== CORRECTED SEARCH FUNCTIONS =====================
+
+
+static string readLineAtOffset(const string &fileName, long long offset) {
+    ifstream in(fileName, ios::binary);
+    if (!in.is_open()) return "";
+    in.seekg(offset);
+    string line;
+    getline(in, line);
+    return line;
+}
+
+// Offset-based helpers
+long long getOffsetByID(const vector<PrimaryIndex> &primaryIndex, const char *id) {
+    int left = 0;
+    int right = (int)primaryIndex.size() - 1;
+
+    while (left <= right) {
+        int mid = left + (right - left) / 2;
+        int cmp = strcmp(id, primaryIndex[mid].recordID);
+        if (cmp == 0) return primaryIndex[mid].offset;
+        if (cmp < 0) right = mid - 1; else left = mid + 1;
+    }
+    return -1;
+}
+
+//// ===================== SEARCH FUNCTIONS =====================
 int getRRNByID(const vector<PrimaryIndex> &primaryIndex, const char *id) {
     int left = 0;
     int right = primaryIndex.size() - 1;
@@ -184,6 +210,27 @@ vector<string> getAllIDsByKey(const vector<SecondaryIndex> &secondaryIndex, cons
     return ids;
 }
 
+long long resolveActiveOffsetForID(const vector<PrimaryIndex> &primaryIndex,
+                                   const string &dataFile,
+                                   const char *id) {
+    int left = 0;
+    int right = (int)primaryIndex.size() - 1;
+    int first = -1;
+    while (left <= right) {
+        int mid = left + (right - left) / 2;
+        int cmp = strcmp(id, primaryIndex[mid].recordID);
+        if (cmp == 0) { first = mid; right = mid - 1; }
+        else if (cmp < 0) right = mid - 1; else left = mid + 1;
+    }
+    if (first == -1) return -1;
+    for (int i = first; i < (int)primaryIndex.size() && strcmp(primaryIndex[i].recordID, id) == 0; ++i) {
+        long long off = primaryIndex[i].offset;
+        string line = readLineAtOffset(dataFile, off);
+        if (!line.empty() && line[0] != DELETE_FLAG) return off;
+    }
+    return -1;
+}
+
 //// ===================== FILE UTILITIES =====================
 vector<string> readAllLines(const string &fileName) {
     vector<string> lines;
@@ -191,7 +238,7 @@ vector<string> readAllLines(const string &fileName) {
     string line;
 
     if (!in.is_open()) {
-        cout << "DEBUG: Could not open " << fileName << " for reading\n";
+        cout << "Could not open " << fileName << " for reading\n";
         return lines;
     }
 
@@ -200,14 +247,13 @@ vector<string> readAllLines(const string &fileName) {
     }
     in.close();
 
-    cout << "DEBUG: Read " << lines.size() << " lines from " << fileName << endl;
     return lines;
 }
 
 void writeAllLines(const string &fileName, const vector<string> &lines) {
     ofstream out(fileName);
     if (!out.is_open()) {
-        cout << "DEBUG: ERROR - Could not open " << fileName << " for writing\n";
+        cout << "ERROR - Could not open " << fileName << " for writing\n";
         return;
     }
 
@@ -215,21 +261,34 @@ void writeAllLines(const string &fileName, const vector<string> &lines) {
         out << line << "\n";
     }
     out.close();
-
-    cout << "DEBUG: Written " << lines.size() << " lines to " << fileName << endl;
 }
 
-void printAvail(const vector<int> &avail) {
-    if (avail.empty()) {
-        cout << "Avail list is empty.\n";
-        return;
+// Map an offset back to line index (RRN) by cumulative lengths
+static int rrnFromOffset(const vector<string> &lines, long long off){
+    long long cur = 0;
+    for(int i=0;i<(int)lines.size();++i){
+        if(cur == off) return i;
+        cur += (long long)lines[i].length() + (long long)newlineBytes();
     }
-    cout << "Available RRNs: ";
-    for (size_t i = 0; i < avail.size(); ++i) {
-        cout << avail[i];
-        if (i + 1 < avail.size()) cout << ", ";
-    }
-    cout << "\n";
+    return -1;
+}
+
+static bool prependDeleteFlagAtOffset(const string &fileName, long long offset) {
+    ifstream in(fileName, ios::binary);
+    if (!in.is_open()) return false;
+    string content((istreambuf_iterator<char>(in)), istreambuf_iterator<char>());
+    in.close();
+
+    if (offset < 0 || offset > (long long)content.size()) return false;
+    if (offset < (long long)content.size() && content[offset] == DELETE_FLAG) return false;
+
+    content.insert((size_t)offset, 1, DELETE_FLAG);
+
+    ofstream out(fileName, ios::binary | ios::trunc);
+    if (!out.is_open()) return false;
+    out.write(content.data(), (streamsize)content.size());
+    out.close();
+    return true;
 }
 
 //// ===================== APPOINTMENT OPERATIONS =====================
@@ -241,14 +300,13 @@ vector<Appointment> searchAppointmentsByDoctorID(const char *doctorID,
 
     if (apptIDs.empty()) return appointments;
 
-    vector<string> lines = readAllLines(appointmentDataFile);
-
     for (auto &apptID : apptIDs) {
-        int rrn = getRRNByID(apptPrimary, apptID.c_str());
-        if (rrn != -1 && rrn < lines.size() && !lines[rrn].empty()) {
-            Appointment appt = Appointment::fromLine(lines[rrn]);
-            if (!appt.isEmpty()) {
-                appointments.push_back(appt);
+        long long off = getOffsetByID(apptPrimary, apptID.c_str());
+        if (off != -1) {
+            string line = readLineAtOffset(appointmentDataFile, off);
+            if (!line.empty() && line[0] != DELETE_FLAG) {
+                Appointment appt = Appointment::fromLine(line);
+                if (!appt.isEmpty()) appointments.push_back(appt);
             }
         }
     }
@@ -260,43 +318,26 @@ bool deleteAppointmentByID(const char *id,
                            vector<PrimaryIndex> &primary,
                            vector<SecondaryIndex> &secondary,
                            vector<int> &avail) {
-    int rrn = getRRNByID(primary, id);
-    if (rrn == -1) {
-        cout << "DEBUG: Appointment " << id << " not found in primary index\n";
+    long long off = getOffsetByID(primary, id);
+    if (off == -1) {
+        cout << "Appointment " << id << " not found in primary index\n";
         return false;
     }
 
-    vector<string> lines = readAllLines(appointmentDataFile);
-    if (rrn >= lines.size()) {
-        cout << "DEBUG: RRN " << rrn << " out of bounds for appointments file\n";
+    string line = readLineAtOffset(appointmentDataFile, off);
+    if (line.empty() || line[0] == DELETE_FLAG) {
+        cout << "Appointment " << id << " already deleted or invalid\n";
         return false;
     }
 
-    if (lines[rrn].empty() || lines[rrn][0] == DELETE_FLAG) {
-        cout << "DEBUG: Appointment " << id << " already deleted\n";
+    if (!prependDeleteFlagAtOffset(appointmentDataFile, off)) {
+        cout << "Failed to mark appointment deleted at offset\n";
         return false;
     }
 
-    // Mark as deleted by prepending DELETE_FLAG
-    lines[rrn] = string(1, DELETE_FLAG) + lines[rrn];
-    writeAllLines(appointmentDataFile, lines);
-    cout << "DEBUG: Marked appointment " << id << " as deleted at RRN " << rrn << endl;
-
-    // Remove from indices
-    primary.erase(remove_if(primary.begin(), primary.end(),
-                            [&](const PrimaryIndex &p) { return strcmp(p.recordID, id) == 0; }), primary.end());
-
-    secondary.erase(remove_if(secondary.begin(), secondary.end(),
-                              [&](const SecondaryIndex &s) { return strcmp(s.linkedID, id) == 0; }), secondary.end());
-
-    sort(primary.begin(), primary.end());
-    sort(secondary.begin(), secondary.end());
-
-    writePrimaryIndex(primary, appointmentPrimaryIndexFile);
-    writeSecondaryIndex(secondary, appointmentSecondaryIndexFile);
-
-    avail.push_back(rrn);
-    cout << "DEBUG: Added RRN " << rrn << " to avail list, now size: " << avail.size() << endl;
+    Build_indexes();
+    primary = readPrimaryIndex(appointmentPrimaryIndexFile);
+    secondary = readSecondaryIndex(appointmentSecondaryIndexFile);
     return true;
 }
 
@@ -339,46 +380,31 @@ bool deleteDoctorByID(const char *id,
                       vector<PrimaryIndex> &apptPrimary,
                       vector<SecondaryIndex> &apptSecondary,
                       vector<int> &apptAvail) {
-    int rrn = getRRNByID(primary, id);
-    if (rrn == -1) {
-        cout << "DEBUG: Doctor " << id << " not found in primary index\n";
+    long long off = getOffsetByID(primary, id);
+    if (off == -1) {
+        cout << "Doctor " << id << " not found in primary index\n";
         return false;
     }
 
     cout << "Deleting all appointments for doctor " << id << "..." << endl;
     deleteAllAppointmentsForDoctor(id, apptPrimary, apptSecondary, apptAvail);
 
-    vector<string> lines = readAllLines(doctorDataFile);
-    if (rrn >= lines.size()) {
-        cout << "DEBUG: RRN " << rrn << " out of bounds for doctors file\n";
+    string line = readLineAtOffset(doctorDataFile, off);
+    if (line.empty() || line[0] == DELETE_FLAG) {
+        cout << "Doctor " << id << " already deleted or invalid\n";
         return false;
     }
 
-    if (lines[rrn].empty() || lines[rrn][0] == DELETE_FLAG) {
-        cout << "DEBUG: Doctor " << id << " already deleted\n";
+    if (!prependDeleteFlagAtOffset(doctorDataFile, off)) {
+        cout << "Failed to mark doctor deleted at offset\n";
         return false;
     }
 
-    // Mark as deleted
-    lines[rrn] = string(1, DELETE_FLAG) + lines[rrn];
-    writeAllLines(doctorDataFile, lines);
-    cout << "DEBUG: Marked doctor " << id << " as deleted at RRN " << rrn << endl;
-
-    // Remove from indices
-    primary.erase(remove_if(primary.begin(), primary.end(),
-                            [&](const PrimaryIndex &p) { return strcmp(p.recordID, id) == 0; }), primary.end());
-
-    secondary.erase(remove_if(secondary.begin(), secondary.end(),
-                              [&](const SecondaryIndex &s) { return strcmp(s.linkedID, id) == 0; }), secondary.end());
-
-    sort(primary.begin(), primary.end());
-    sort(secondary.begin(), secondary.end());
-
-    writePrimaryIndex(primary, doctorPrimaryIndexFile);
-    writeSecondaryIndex(secondary, doctorSecondaryIndexFile);
-
-    avail.push_back(rrn);
-    cout << "DEBUG: Added RRN " << rrn << " to doctor avail list\n";
+    Build_indexes();
+    primary = readPrimaryIndex(doctorPrimaryIndexFile);
+    secondary = readSecondaryIndex(doctorSecondaryIndexFile);
+    apptPrimary = readPrimaryIndex(appointmentPrimaryIndexFile);
+    apptSecondary = readSecondaryIndex(appointmentSecondaryIndexFile);
     return true;
 }
 
@@ -398,10 +424,15 @@ bool addDoctor(vector<PrimaryIndex> &primary,vector<SecondaryIndex> &secondary,v
     cout << "Enter Specialty: "; cin >> d.Specialty;
     cout << "Enter Doctor ID: "; cin >> d.ID;
 
-    // Check if ID already exists
-    if (getRRNByID(primary, d.ID) != -1) {
-        cout << "Doctor with this ID already exists.\n";
-        return false;
+    // Refresh indexes and verify existence only if active (not deleted)
+    primary = readPrimaryIndex(doctorPrimaryIndexFile);
+    long long eoff = getOffsetByID(primary, d.ID);
+    if (eoff != -1) {
+        string eline = readLineAtOffset(doctorDataFile, eoff);
+        if (!eline.empty() && eline[0] != DELETE_FLAG) {
+            cout << "Doctor with this ID already exists.\n";
+            return false;
+        }
     }
 
     vector<string> lines = readAllLines(doctorDataFile);
@@ -424,10 +455,12 @@ bool addDoctor(vector<PrimaryIndex> &primary,vector<SecondaryIndex> &secondary,v
     // Write doctor record
     writeAllLines(doctorDataFile, lines);
 
-    // Update primary index
+    // Update primary index using offset
+    long long offset = 0;
+    for (int i = 0; i < rrn; ++i) offset += (long long)lines[i].length() + (long long)newlineBytes();
     PrimaryIndex p;
     safe_strcpy(p.recordID, d.ID, sizeof(p.recordID));
-    p.recordLength = rrn;
+    p.offset = (int)offset;
     primary.push_back(p);
     sort(primary.begin(), primary.end());
     writePrimaryIndex(primary, doctorPrimaryIndexFile);
@@ -440,7 +473,10 @@ bool addDoctor(vector<PrimaryIndex> &primary,vector<SecondaryIndex> &secondary,v
     sort(secondary.begin(), secondary.end());
     writeSecondaryIndex(secondary, doctorSecondaryIndexFile);
 
-    cout << "Doctor added successfully at RRN " << rrn << endl;
+    Build_indexes();
+    primary = readPrimaryIndex(doctorPrimaryIndexFile);
+    secondary = readSecondaryIndex(doctorSecondaryIndexFile);
+    cout << "Doctor added successfully" << endl;
     return true;
 }
 
@@ -451,21 +487,26 @@ bool addAppointment(vector<PrimaryIndex> &primary,vector<SecondaryIndex> &second
     cout << "Enter Doctor ID: "; cin >> a.DoctorID;
     cout << "Enter Date (no spaces): "; cin >> a.Date;
 
-    // Check if Appointment ID exists
-    if (getRRNByID(primary, a.ID) != -1) {
-        cout << "Appointment already exists.\n";
-        return false;
+    // Refresh and verify existence only if active (not deleted)
+    primary = readPrimaryIndex(appointmentPrimaryIndexFile);
+    long long aoff = getOffsetByID(primary, a.ID);
+    if (aoff != -1) {
+        string aline = readLineAtOffset(appointmentDataFile, aoff);
+        if (!aline.empty() && aline[0] != DELETE_FLAG) {
+            cout << "Appointment already exists.\n";
+            return false;
+        }
     }
 
     // Validate DoctorID exists and not deleted
-    int drrn = getRRNByID(doctorPrimary, a.DoctorID);
-    if (drrn == -1) {
+    long long doff = resolveActiveOffsetForID(doctorPrimary, doctorDataFile, a.DoctorID);
+    if (doff == -1) {
         cout << "Doctor does not exist. Cannot add appointment.\n";
         return false;
     }
     {
-        vector<string> dlines = readAllLines(doctorDataFile);
-        if (drrn < 0 || drrn >= (int)dlines.size() || dlines[drrn].empty() || dlines[drrn][0] == DELETE_FLAG) {
+        string dline = readLineAtOffset(doctorDataFile, doff);
+        if (dline.empty() || dline[0] == DELETE_FLAG) {
             cout << "Doctor record is deleted or invalid. Cannot add appointment.\n";
             return false;
         }
@@ -489,10 +530,12 @@ bool addAppointment(vector<PrimaryIndex> &primary,vector<SecondaryIndex> &second
 
     writeAllLines(appointmentDataFile, lines);
 
-    // Update indices
+    // Update indices using offset
+    long long offset = 0;
+    for (int i = 0; i < rrn; ++i) offset += (long long)lines[i].length() + (long long)newlineBytes();
     PrimaryIndex p;
     safe_strcpy(p.recordID, a.ID, sizeof(p.recordID));
-    p.recordLength = rrn;
+    p.offset = (int)offset;
     primary.push_back(p);
     sort(primary.begin(), primary.end());
     writePrimaryIndex(primary, appointmentPrimaryIndexFile);
@@ -504,8 +547,10 @@ bool addAppointment(vector<PrimaryIndex> &primary,vector<SecondaryIndex> &second
     sort(secondary.begin(), secondary.end());
     writeSecondaryIndex(secondary, appointmentSecondaryIndexFile);
     secondary = readSecondaryIndex(appointmentSecondaryIndexFile);
-
-    cout << "Appointment added successfully at RRN " << rrn << endl;
+    Build_indexes();
+    primary = readPrimaryIndex(appointmentPrimaryIndexFile);
+    secondary = readSecondaryIndex(appointmentSecondaryIndexFile);
+    cout << "Appointment added successfully" << endl;
     return true;
 }
 
@@ -515,14 +560,14 @@ bool updateDoctor(vector<PrimaryIndex> &primary,vector<SecondaryIndex> &secondar
     cout << "Enter Doctor ID to update: ";
     cin >> id;
 
-    int rrn = getRRNByID(primary, id);
-    if (rrn == -1) {
+    long long off = resolveActiveOffsetForID(primary, doctorDataFile, id);
+    if (off == -1) {
         cout << "Doctor not found.\n";
         return false;
     }
-
     vector<string> lines = readAllLines(doctorDataFile);
-    if (rrn < 0 || rrn >= lines.size() || lines[rrn].empty() || lines[rrn][0] == DELETE_FLAG) {
+    int rrn = rrnFromOffset(lines, off);
+    if (rrn == -1 || lines[rrn].empty() || lines[rrn][0] == DELETE_FLAG) {
         cout << "Invalid or deleted record.\n";
         return false;
     }
@@ -563,27 +608,29 @@ bool updateDoctor(vector<PrimaryIndex> &primary,vector<SecondaryIndex> &secondar
 bool updateAppointment(vector<PrimaryIndex> &primary,vector<SecondaryIndex> &secondary, const vector<PrimaryIndex> &doctorPrimary) {
     char id[15];
     cout << "Enter Appointment ID to update: "; cin >> id;
-    int rrn = getRRNByID(primary, id);
-    if (rrn == -1) {
+    long long off = resolveActiveOffsetForID(primary, appointmentDataFile, id);
+    if (off == -1) {
         cout << "Appointment not found.\n";
         return false;
     }
 
     vector<string> lines = readAllLines(appointmentDataFile);
+    int rrn = rrnFromOffset(lines, off);
+    if (rrn == -1) { cout << "Invalid record position.\n"; return false; }
     Appointment a = Appointment::fromLine(lines[rrn]);
     cout << "Current: " << a;
     cout << "Enter new DoctorID: "; cin >> a.DoctorID;
     cout << "Enter new Date: "; cin >> a.Date;
 
     // Validate new DoctorID
-    int drrn = getRRNByID(doctorPrimary, a.DoctorID);
-    if (drrn == -1) {
+    long long doff = getOffsetByID(doctorPrimary, a.DoctorID);
+    if (doff == -1) {
         cout << "Doctor does not exist. Update aborted.\n";
         return false;
     }
     {
-        vector<string> dlines = readAllLines(doctorDataFile);
-        if (drrn < 0 || drrn >= (int)dlines.size() || dlines[drrn].empty() || dlines[drrn][0] == DELETE_FLAG) {
+        string dline = readLineAtOffset(doctorDataFile, doff);
+        if (dline.empty() || dline[0] == DELETE_FLAG) {
             cout << "Doctor record is deleted or invalid. Update aborted.\n";
             return false;
         }
@@ -603,3 +650,4 @@ bool updateAppointment(vector<PrimaryIndex> &primary,vector<SecondaryIndex> &sec
     cout << "Appointment updated successfully.\n";
     return true;
 }
+
