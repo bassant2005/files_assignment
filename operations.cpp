@@ -246,7 +246,13 @@ long long resolveActiveOffsetForID(const vector<PrimaryIndex> &primaryIndex,
         if (strcmp(id, cmpID) != 0) break;
         long long off = primaryIndex[i].offset;
         string line = readLineAtOffset(dataFile, off);
-        if (!line.empty() && line[0] != DELETE_FLAG) return off;
+        if (!line.empty() && line[0] != DELETE_FLAG) {
+            // Use the Doctor::fromLine method to properly parse the line
+            Doctor d = Doctor::fromLine(line);
+            if (!d.isEmpty() && strcmp(id, d.ID) == 0) {
+                return off;
+            }
+        }
     }
     return -1;
 }
@@ -346,10 +352,18 @@ bool deleteAppointmentByID(const char *id,
                            vector<int> &avail) {
     // Find the offset of the record to delete
     long long off = -1;
+    bool isDeletedInIndex = false;
     
     // Find the record in primary index
     for (const auto &entry : primary) {
-        if (strcmp(entry.recordID, id) == 0) {
+        // Check for deleted entries in the index
+        if (entry.recordID[0] == '*') {
+            if (strcmp(entry.recordID + 1, id) == 0) {
+                isDeletedInIndex = true;
+                off = entry.offset;
+                break;
+            }
+        } else if (strcmp(entry.recordID, id) == 0) {
             off = entry.offset;
             break;
         }
@@ -360,14 +374,26 @@ bool deleteAppointmentByID(const char *id,
         return false;
     }
 
-    // Read the record to verify it's not already deleted
+    // Read the record to verify its current state
     string line = readLineAtOffset(appointmentDataFile, off);
     if (line.empty()) {
-        cout << "Error reading appointment data\n";
+        cout << "Error: Could not read appointment data\n";
         return false;
     }
     
+    // Check if the record is already deleted in the data file
     if (line[0] == DELETE_FLAG) {
+        // If it's deleted in the data file but not in the index, update the index
+        if (!isDeletedInIndex) {
+            for (auto &entry : primary) {
+                if (strcmp(entry.recordID, id) == 0) {
+                    string deletedID = string("*") + id;
+                    strcpy(entry.recordID, deletedID.c_str());
+                    writePrimaryIndex(primary, appointmentPrimaryIndexFile);
+                    break;
+                }
+            }
+        }
         cout << "Appointment " << id << " is already deleted\n";
         return false;
     }
@@ -449,8 +475,18 @@ bool deleteDoctorByID(const char *id,
                       vector<int> &apptAvail) {
     // Find the doctor's offset
     long long off = -1;
+    bool isDeletedInIndex = false;
+    
+    // First check if the ID exists in the primary index and get its offset
     for (const auto &entry : primary) {
-        if (strcmp(entry.recordID, id) == 0) {
+        // Skip already deleted entries in the index
+        if (entry.recordID[0] == '*') {
+            if (strcmp(entry.recordID + 1, id) == 0) {
+                isDeletedInIndex = true;
+                off = entry.offset;
+                break;
+            }
+        } else if (strcmp(entry.recordID, id) == 0) {
             off = entry.offset;
             break;
         }
@@ -461,9 +497,26 @@ bool deleteDoctorByID(const char *id,
         return false;
     }
 
-    // Read the record to verify it's not already deleted
+    // Read the record to verify its current state
     string line = readLineAtOffset(doctorDataFile, off);
-    if (line.empty() || line[0] == DELETE_FLAG) {
+    if (line.empty()) {
+        cout << "Error: Could not read doctor data\n";
+        return false;
+    }
+    
+    // Check if the record is already deleted in the data file
+    if (line[0] == DELETE_FLAG) {
+        // If it's deleted in the data file but not in the index, update the index
+        if (!isDeletedInIndex) {
+            for (auto &entry : primary) {
+                if (strcmp(entry.recordID, id) == 0) {
+                    string deletedID = string("*") + id;
+                    strcpy(entry.recordID, deletedID.c_str());
+                    writePrimaryIndex(primary, doctorPrimaryIndexFile);
+                    break;
+                }
+            }
+        }
         cout << "Doctor " << id << " is already deleted\n";
         return false;
     }
