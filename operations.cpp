@@ -10,15 +10,6 @@ using namespace std;
 
 const char DELETE_FLAG = '*';
 
-// Returns the number of bytes used for newline on the current platform
-int newlineBytes() {
-#ifdef _WIN32
-    return 2; // Windows uses \r\n (2 bytes)
-#else
-    return 1; // Unix/Linux uses \n (1 byte)
-#endif
-}
-
 // Safe copy helper: prevents buffer overflow
 void safe_strcpy(char* dest, const char* src, size_t size) {
     strncpy(dest, src, size - 1);
@@ -247,11 +238,7 @@ long long resolveActiveOffsetForID(const vector<PrimaryIndex> &primaryIndex,
         long long off = primaryIndex[i].offset;
         string line = readLineAtOffset(dataFile, off);
         if (!line.empty() && line[0] != DELETE_FLAG) {
-            // Use the Doctor::fromLine method to properly parse the line
-            Doctor d = Doctor::fromLine(line);
-            if (!d.isEmpty() && strcmp(id, d.ID) == 0) {
-                return off;
-            }
+            return off;
         }
     }
     return -1;
@@ -298,8 +285,40 @@ static int rrnFromOffset(const vector<string> &lines, long long off){
     long long cur = 0;
     for(int i=0;i<(int)lines.size();++i){
         if(cur == off) return i;
-        cur += (long long)lines[i].length() + (long long)newlineBytes();
+        cur += (long long)lines[i].length() + 1;
     }
+    return -1;
+}
+
+static vector<long long> computeLineOffsets(const string &fileName){
+    vector<long long> offsets;
+    ifstream in(fileName, ios::binary);
+    if(!in.is_open()) return offsets;
+    string line;
+    while(true){
+        long long start = (long long)in.tellg();
+        if(!getline(in, line)) break;
+        offsets.push_back(start);
+    }
+    in.close();
+    return offsets;
+}
+
+static int rrnFromOffsetBinary(const string &fileName, long long off){
+    vector<long long> offs = computeLineOffsets(fileName);
+    for(int i=0;i<(int)offs.size();++i){
+        if(offs[i] == off) return i;
+    }
+    return -1;
+}
+
+static int rrnFromApproxOffsetBinary(const string &fileName, long long off){
+    vector<long long> offs = computeLineOffsets(fileName);
+    if(offs.empty()) return -1;
+    for(int i=0;i<(int)offs.size()-1;++i){
+        if(off >= offs[i] && off < offs[i+1]) return i;
+    }
+    if(off >= offs.back()) return (int)offs.size()-1;
     return -1;
 }
 
@@ -398,14 +417,9 @@ bool deleteAppointmentByID(const char *id,
         return false;
     }
 
-    vector<string> linesBefore = readAllLines(appointmentDataFile);
-    int rrn = rrnFromOffset(linesBefore, off);
     if (!prependDeleteFlagAtOffset(appointmentDataFile, off)) {
         cout << "Failed to mark appointment as deleted\n";
         return false;
-    }
-    if (rrn != -1) {
-        avail.push_back(rrn);
     }
     
     // Update the primary index to mark this record as deleted
@@ -427,10 +441,12 @@ bool deleteAppointmentByID(const char *id,
         }
     }
     
-    // Write the updated indexes back to files
     writePrimaryIndex(primary, appointmentPrimaryIndexFile);
     writeSecondaryIndex(secondary, appointmentSecondaryIndexFile);
-    
+
+    Build_indexes();
+    primary = readPrimaryIndex(appointmentPrimaryIndexFile);
+    secondary = readSecondaryIndex(appointmentSecondaryIndexFile);
     cout << "Successfully deleted appointment " << id << "\n";
     return true;
 }
@@ -525,14 +541,9 @@ bool deleteDoctorByID(const char *id,
     cout << "Deleting all appointments for doctor " << id << "...\n";
     deleteAllAppointmentsForDoctor(id, apptPrimary, apptSecondary, apptAvail);
 
-    vector<string> linesBeforeDoc = readAllLines(doctorDataFile);
-    int rrnDoc = rrnFromOffset(linesBeforeDoc, off);
     if (!prependDeleteFlagAtOffset(doctorDataFile, off)) {
         cout << "Failed to mark doctor as deleted in data file\n";
         return false;
-    }
-    if (rrnDoc != -1) {
-        avail.push_back(rrnDoc);
     }
 
     // Update primary index to mark as deleted
@@ -555,7 +566,12 @@ bool deleteDoctorByID(const char *id,
     // Write updated indexes
     writePrimaryIndex(primary, doctorPrimaryIndexFile);
     writeSecondaryIndex(secondary, doctorSecondaryIndexFile);
-    
+
+    Build_indexes();
+    primary = readPrimaryIndex(doctorPrimaryIndexFile);
+    secondary = readSecondaryIndex(doctorSecondaryIndexFile);
+    apptPrimary = readPrimaryIndex(appointmentPrimaryIndexFile);
+    apptSecondary = readSecondaryIndex(appointmentSecondaryIndexFile);
     cout << "Successfully deleted doctor " << id << " and all related appointments\n";
     return true;
 }
@@ -606,7 +622,7 @@ bool addDoctor(vector<PrimaryIndex> &primary,vector<SecondaryIndex> &secondary,v
 
     // Update primary index using offset
     long long offset = 0;
-    for (int i = 0; i < rrn; ++i) offset += (long long)lines[i].length() + (long long)newlineBytes();
+    for (int i = 0; i < rrn; ++i) offset += (long long)lines[i].length() + 1;
     PrimaryIndex p;
     safe_strcpy(p.recordID, d.ID, sizeof(p.recordID));
     p.offset = (int)offset;
@@ -677,7 +693,7 @@ bool addAppointment(vector<PrimaryIndex> &primary,vector<SecondaryIndex> &second
     writeAllLines(appointmentDataFile, lines);
 
     long long offset = 0;
-    for (int i = 0; i < rrn; ++i) offset += (long long)lines[i].length() + (long long)newlineBytes();
+    for (int i = 0; i < rrn; ++i) offset += (long long)lines[i].length() + 1;
     PrimaryIndex p;
     safe_strcpy(p.recordID, a.ID, sizeof(p.recordID));
     p.offset = (int)offset;
@@ -689,20 +705,20 @@ bool addAppointment(vector<PrimaryIndex> &primary,vector<SecondaryIndex> &second
     SecondaryIndex s;
     safe_strcpy(s.keyValue, a.DoctorID, sizeof(s.keyValue));
     safe_strcpy(s.linkedID, a.ID, sizeof(s.linkedID));
-    
+
     // Read current secondary index to avoid duplicates
     secondary = readSecondaryIndex(appointmentSecondaryIndexFile);
-    
+
     // Check if this doctor-appointment mapping already exists
     bool exists = false;
     for (const auto& entry : secondary) {
-        if (strcmp(entry.keyValue, a.DoctorID) == 0 && 
+        if (strcmp(entry.keyValue, a.DoctorID) == 0 &&
             strcmp(entry.linkedID, a.ID) == 0) {
             exists = true;
             break;
         }
     }
-    
+
     if (!exists) {
         secondary.push_back(s);
         sort(secondary.begin(), secondary.end());

@@ -180,23 +180,23 @@ int main(){
             }
         } else if(choice == "8"){
             char id[15]; cout << "Enter Appointment ID: "; cin >> id;
-            long long offActive = resolveActiveOffsetForID(apptPrimary, appointmentDataFile, id);
-            if (offActive != -1) {
-                string line = readLineAtOffset(appointmentDataFile, offActive);
-                Appointment a = Appointment::fromLine(line);
-                cout << a;
-            } else {
-                long long anyOff = getOffsetByID(apptPrimary, id);
-                if (anyOff != -1) {
-                    string line = readLineAtOffset(appointmentDataFile, anyOff);
-                    if (!line.empty() && line[0] == DELETE_FLAG) {
-                        cout << "Appointment " << id << " has been deleted\n";
+            // First try to find the appointment in the primary index
+            bool found = false;
+            for (const auto &entry : apptPrimary) {
+                if (strcmp(entry.recordID, id) == 0) {
+                    found = true;
+                    string line = readLineAtOffset(appointmentDataFile, entry.offset);
+                    if(!line.empty() && line[0] != DELETE_FLAG) {
+                        Appointment a = Appointment::fromLine(line);
+                        cout << a;
                     } else {
-                        cout << "Appointment " << id << " not found\n";
+                        cout << "Appointment " << id << " has been deleted\n";
                     }
-                } else {
-                    cout << "Appointment " << id << " not found\n";
+                    break;
                 }
+            }
+            if (!found) {
+                cout << "Appointment " << id << " not found\n";
             }
         } else if(choice == "9"){
             cout << "Enter query: ";

@@ -160,7 +160,7 @@ vector<PrimaryIndex> buildPrimaryIndexLength(const string &dataFile,
         entry.offset = currentOffset;
 
         // +1 for '\n'
-        entry.recordLength = line.length() + 1;
+        entry.recordLength = (int)line.length() + 1;
         currentOffset += entry.recordLength;
 
         primaryIndex.push_back(entry);
