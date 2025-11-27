@@ -19,6 +19,12 @@ int newlineBytes() {
 #endif
 }
 
+// Safe copy helper: prevents buffer overflow
+void safe_strcpy(char* dest, const char* src, size_t size) {
+    strncpy(dest, src, size - 1);
+    dest[size - 1] = '\0';
+}
+
 /**
  * ===============================================================
  *  GENERAL Struct for Doctor and Appointment & GENERAL DELETE & SEARCH functions
@@ -28,13 +34,6 @@ int newlineBytes() {
  *  Student ID: 20230117
  * ===============================================================
  */
-
-
-// Safe copy helper: prevents buffer overflow
-void safe_strcpy(char* dest, const char* src, size_t size) {
-    strncpy(dest, src, size - 1);
-    dest[size - 1] = '\0';
-}
 
 // -------------------- Doctor struct --------------------
 struct Doctor {
@@ -702,6 +701,7 @@ bool updateDoctor(vector<PrimaryIndex> &primary,vector<SecondaryIndex> &secondar
             safe_strcpy(s.keyValue, d.Name, sizeof(s.keyValue));
         }
     }
+
     sort(secondary.begin(), secondary.end());
     writeSecondaryIndex(secondary, doctorSecondaryIndexFile);
 
