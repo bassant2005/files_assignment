@@ -60,7 +60,7 @@ vector<string> split(const string &line, char delim = '|') {
 }
 
 //// ===================== WRITE FUNCTIONS =====================
-// Writes the primary index (ID|RRN) to a file
+// Writes the primary index (ID|Offset) to a file
 void writePrimaryIndex(const vector<PrimaryIndex> &indexList, const string &fileName) {
     ofstream out(fileName);
     for (const auto &entry : indexList) {
@@ -130,24 +130,36 @@ vector<SecondaryIndex> readSecondaryIndex(const string &fileName) {
 vector<PrimaryIndex> buildPrimaryIndexLength(const string &dataFile,
                                              const string &indexFile,
                                              int idFieldIndex) {
+
     ifstream in(dataFile);
     vector<PrimaryIndex> primaryIndex;
     string line;
+    // Tracks byte offset in the file
     long long currentOffset = 0;
 
+    // Read each record line-by-line
     while (getline(in, line)) {
         if (line.empty()) continue;
-        bool deleted = (line[0] == '*');
-        string cleanLine = deleted ? line.substr(1) : line;
+
+        // Check if the record is marked deleted
+        // Remove the '*' mark if deleted to extract clean fields
+        string cleanLine = (line[0] == '*') ? line.substr(1) : line;
+
         auto fields = split(cleanLine);
         if (fields.size() <= idFieldIndex) continue;
 
         PrimaryIndex entry;
+
+        // Extract ID (if deleted → add '*' back AFTER extraction)
         string id = fields[idFieldIndex];
-        if (deleted) id = "*" + id;
+        if ((line[0] == '*')) id = "*" + id;
 
         strcpy(entry.recordID, id.c_str());
+
+        // Save current offset
         entry.offset = currentOffset;
+
+        // +1 for '\n'
         entry.recordLength = line.length() + 1;
         currentOffset += entry.recordLength;
 
@@ -156,91 +168,118 @@ vector<PrimaryIndex> buildPrimaryIndexLength(const string &dataFile,
 
     in.close();
 
-    // Sort primary index while IGNORING leading '*' in the ID
+    // Sort primary index alphabetically, but IGNORE '*' when comparing
     sort(primaryIndex.begin(), primaryIndex.end(),
          [](const PrimaryIndex &a, const PrimaryIndex &b) {
+             // Compare IDs without '*' prefix
              string A = (a.recordID[0] == '*') ? a.recordID + 1 : a.recordID;
              string B = (b.recordID[0] == '*') ? b.recordID + 1 : b.recordID;
 
+             // If IDs match, keep non-deleted first
              if (A == B) return a.recordID[0] != '*';
+
+             // Normal alphabetical comparison
              return A < B;
          }
     );
 
-    writePrimaryIndex(primaryIndex, indexFile);
+    writePrimaryIndex(primaryIndex, indexFile); // Store index into a file
     return primaryIndex;
 }
 
-// Build the secondary index: key = DoctorID, linkedID = AppointmentID
-// Handles deletion markers '*' for each field independently
+// BUILD Secondary INDEX
 vector<SecondaryIndex> buildSecondaryIndex(const string &appointmentsFile,
                                            const string &doctorsFile,
                                            const string &indexFile,
                                            int keyFieldIndex,      // DoctorID in appointment file
                                            int linkedFieldIndex) { // AppointmentID in appointment file
+
     ifstream appIn(appointmentsFile);
     if (!appIn.is_open()) {
         cout << "Cannot open " << appointmentsFile << "\n";
         return {};
     }
 
-    // Step 1: Read doctor deletion info into a map
     ifstream docIn(doctorsFile);
-    unordered_map<string, bool> doctorDeleted; // DoctorID -> deleted?
+    // doctorID → deleted?
+    unordered_map<string, bool> doctorDeleted;
+
     string line;
     while (getline(docIn, line)) {
         if (line.empty()) continue;
-        bool deleted = line[0] == '*';
-        string cleanLine = deleted ? line.substr(1) : line;
-        auto fields = split(cleanLine);
-        if (fields.size() < 4) continue; // DoctorID is field 3
-        string doctorID = fields[3];
-        doctorDeleted[doctorID] = deleted;
-    }
-    docIn.close();
 
-    // Step 2: Build secondary index from appointments
+        string cleanLine = (line[0] == '*') ? line.substr(1) : line;
+
+        auto fields = split(cleanLine);
+        if (fields.size() < 4) continue;
+
+        string doctorID = fields[3];
+        doctorDeleted[doctorID] = (line[0] == '*');
+    }
+
+    docIn.close();
     vector<SecondaryIndex> secondaryIndex;
     while (getline(appIn, line)) {
         if (line.empty()) continue;
-        bool appDeleted = line[0] == '*';
-        string cleanLine = appDeleted ? line.substr(1) : line;
+
+        string cleanLine = (line[0] == '*') ? line.substr(1) : line;
+
         auto fields = split(cleanLine);
         if (fields.size() <= max(keyFieldIndex, linkedFieldIndex)) continue;
 
-        string doctorID = fields[keyFieldIndex];
+        string doctorID = fields[keyFieldIndex];   // Extract doctorID (foreign key)
         string appointmentID = fields[linkedFieldIndex];
 
+        // If doctor deleted → mark with '*'
         if (doctorDeleted.count(doctorID) && doctorDeleted[doctorID])
             doctorID = "*" + doctorID;
-        if (appDeleted)
+
+        // If appointment deleted → mark with '*'
+        if (line[0] == '*')
             appointmentID = "*" + appointmentID;
 
+        // Fill entry
         SecondaryIndex entry;
         strcpy(entry.keyValue, doctorID.c_str());
         strcpy(entry.linkedID, appointmentID.c_str());
+
         secondaryIndex.push_back(entry);
     }
+
     appIn.close();
 
-    // Step 3: Sort secondary index ignoring '*'
+    //Sort secondary index
     sort(secondaryIndex.begin(), secondaryIndex.end(),
          [](const SecondaryIndex &a, const SecondaryIndex &b) {
+
+             // Compare doctorID without '*'
              string keyA = (a.keyValue[0] == '*') ? a.keyValue + 1 : a.keyValue;
              string keyB = (b.keyValue[0] == '*') ? b.keyValue + 1 : b.keyValue;
-             if (keyA != keyB) return keyA < keyB;
 
+             if (keyA != keyB)
+                 // Primary sort: doctorID
+                 return keyA < keyB;
+
+             // Compare appointmentID without '*'
              string idA = (a.linkedID[0] == '*') ? a.linkedID + 1 : a.linkedID;
              string idB = (b.linkedID[0] == '*') ? b.linkedID + 1 : b.linkedID;
-             if (idA != idB) return idA < idB;
 
-             if (a.keyValue[0] != b.keyValue[0]) return a.keyValue[0] != '*';
-             if (a.linkedID[0] != b.linkedID[0]) return a.linkedID[0] != '*';
+             if (idA != idB)
+                 // Secondary sort: appointmentID
+                 return idA < idB;
+
+             // Non-deleted should appear before deleted
+             if (a.keyValue[0] != b.keyValue[0])
+                 return a.keyValue[0] != '*';
+
+             if (a.linkedID[0] != b.linkedID[0])
+                 return a.linkedID[0] != '*';
+
              return false;
          }
     );
 
-    writeSecondaryIndex(secondaryIndex, indexFile);
+    writeSecondaryIndex(secondaryIndex, indexFile);  // Write index to file
     return secondaryIndex;
 }
 
