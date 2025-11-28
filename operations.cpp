@@ -672,8 +672,13 @@ bool addDoctor(vector<PrimaryIndex> &primary,vector<SecondaryIndex> &secondary,v
     vector<string> lines = readAllLines(doctorDataFile);
     int rrn;
 
+    // Prefer filling a leading blank line (happens if file started with newline)
+    if (!lines.empty() && lines[0].empty()) {
+        rrn = 0;
+        lines[0] = d.toLine();
+    }
     // Reuse from avail list if possible
-    if (!avail.empty()) {
+    else if (!avail.empty()) {
         rrn = avail.back();
         avail.pop_back();
         if (rrn < lines.size()) lines[rrn] = d.toLine();
@@ -745,7 +750,10 @@ bool addAppointment(vector<PrimaryIndex> &primary,vector<SecondaryIndex> &second
 
     vector<string> lines = readAllLines(appointmentDataFile);
     int rrn;
-    if (!avail.empty()) {
+    if (!lines.empty() && lines[0].empty()) {
+        rrn = 0;
+        lines[0] = a.toLine();
+    } else if (!avail.empty()) {
         rrn = avail.back();
         avail.pop_back();
         if (rrn < (int)lines.size()) {
@@ -793,6 +801,11 @@ bool addAppointment(vector<PrimaryIndex> &primary,vector<SecondaryIndex> &second
         sort(secondary.begin(), secondary.end());
         writeSecondaryIndex(secondary, appointmentSecondaryIndexFile);
     }
+
+    // Keep all appointment-related indexes in sync just like doctor additions
+    Build_indexes();
+    primary = readPrimaryIndex(appointmentPrimaryIndexFile);
+    secondary = readSecondaryIndex(appointmentSecondaryIndexFile);
     cout << "Appointment added successfully" << endl;
     return true;
 }
