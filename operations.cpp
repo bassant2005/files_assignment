@@ -5,6 +5,7 @@
 #include <vector>
 #include <algorithm>
 #include <string>
+#include <limits>
 
 using namespace std;
 
@@ -14,6 +15,34 @@ const char DELETE_FLAG = '*';
 void safe_strcpy(char* dest, const char* src, size_t size) {
     strncpy(dest, src, size - 1);
     dest[size - 1] = '\0';
+}
+
+static void readLineField(const char* prompt, char* dest, size_t size) {
+    cout << prompt;
+    string input;
+    getline(cin >> ws, input);
+    safe_strcpy(dest, input.c_str(), size);
+}
+
+static size_t recordSlotCapacity(const vector<string> &lines, int rrn) {
+    if (rrn < 0 || rrn >= (int)lines.size()) return 0;
+    const string &line = lines[rrn];
+    if (line.empty()) return 0;
+    if (line[0] == DELETE_FLAG) return line.size() - 1; // ignore delete marker
+    return line.size();
+}
+
+static int popFirstFitSlot(vector<int> &avail, const vector<string> &lines, size_t neededLen) {
+    for (size_t i = 0; i < avail.size(); ++i) {
+        int rrn = avail[i];
+        size_t capacity = recordSlotCapacity(lines, rrn);
+        if (capacity >= neededLen) {
+            int slot = rrn;
+            avail.erase(avail.begin() + (int)i);
+            return slot;
+        }
+    }
+    return -1;
 }
 
 /**
@@ -657,9 +686,9 @@ bool deleteDoctorByID(const char *id,
 // ---------- Add New Doctor ----------
 bool addDoctor(vector<PrimaryIndex> &primary,vector<SecondaryIndex> &secondary,vector<int> &avail) {
     Doctor d;
-    cout << "Enter Doctor Name: "; cin >> d.Name;
-    cout << "Enter Specialty: "; cin >> d.Specialty;
-    cout << "Enter Doctor ID: "; cin >> d.ID;
+    readLineField("Enter Doctor Name: ", d.Name, sizeof(d.Name));
+    readLineField("Enter Specialty: ", d.Specialty, sizeof(d.Specialty));
+    readLineField("Enter Doctor ID: ", d.ID, sizeof(d.ID));
 
     // Refresh indexes and verify existence only if active (not deleted)
     primary = readPrimaryIndex(doctorPrimaryIndexFile);
@@ -670,25 +699,28 @@ bool addDoctor(vector<PrimaryIndex> &primary,vector<SecondaryIndex> &secondary,v
     }
 
     vector<string> lines = readAllLines(doctorDataFile);
-    int rrn;
+    string newLine = d.toLine();
+    size_t neededLen = newLine.size();
+    int rrn = -1;
 
     // Prefer filling a leading blank line (happens if file started with newline)
     if (!lines.empty() && lines[0].empty()) {
         rrn = 0;
-        lines[0] = d.toLine();
-    }
-    // Reuse from avail list if possible
-    else if (!avail.empty()) {
-        rrn = avail.back();
-        avail.pop_back();
-        if (rrn < lines.size()) lines[rrn] = d.toLine();
-        else {
-            while (lines.size() <= rrn) lines.push_back("");
-            lines[rrn] = d.toLine();
-        }
+        lines[0] = newLine;
     } else {
-        rrn = lines.size();
-        lines.push_back(d.toLine());
+        int slot = popFirstFitSlot(avail, lines, neededLen);
+        if (slot != -1) {
+            rrn = slot;
+            if (rrn < (int)lines.size()) {
+                lines[rrn] = newLine;
+            } else {
+                while ((int)lines.size() <= rrn) lines.push_back("");
+                lines[rrn] = newLine;
+            }
+        } else {
+            rrn = (int)lines.size();
+            lines.push_back(newLine);
+        }
     }
 
     // Write doctor record
@@ -722,9 +754,9 @@ bool addDoctor(vector<PrimaryIndex> &primary,vector<SecondaryIndex> &secondary,v
 // ---------- Add New Appointment ----------
 bool addAppointment(vector<PrimaryIndex> &primary,vector<SecondaryIndex> &secondary,vector<int> &avail, const vector<PrimaryIndex> &doctorPrimary) {
     Appointment a;
-    cout << "Enter Appointment ID: "; cin >> a.ID;
-    cout << "Enter Doctor ID: "; cin >> a.DoctorID;
-    cout << "Enter Date (no spaces): "; cin >> a.Date;
+    readLineField("Enter Appointment ID: ", a.ID, sizeof(a.ID));
+    readLineField("Enter Doctor ID: ", a.DoctorID, sizeof(a.DoctorID));
+    readLineField("Enter Date (no spaces): ", a.Date, sizeof(a.Date));
 
     // Refresh and verify existence only if active (not deleted)
     primary = readPrimaryIndex(appointmentPrimaryIndexFile);
@@ -749,22 +781,26 @@ bool addAppointment(vector<PrimaryIndex> &primary,vector<SecondaryIndex> &second
     }
 
     vector<string> lines = readAllLines(appointmentDataFile);
+    string newLine = a.toLine();
+    size_t neededLen = newLine.size();
     int rrn;
     if (!lines.empty() && lines[0].empty()) {
         rrn = 0;
-        lines[0] = a.toLine();
-    } else if (!avail.empty()) {
-        rrn = avail.back();
-        avail.pop_back();
-        if (rrn < (int)lines.size()) {
-            lines[rrn] = a.toLine();
-        } else {
-            while ((int)lines.size() <= rrn) lines.push_back("");
-            lines[rrn] = a.toLine();
-        }
+        lines[0] = newLine;
     } else {
-        rrn = (int)lines.size();
-        lines.push_back(a.toLine());
+        int slot = popFirstFitSlot(avail, lines, neededLen);
+        if (slot != -1) {
+            rrn = slot;
+            if (rrn < (int)lines.size()) {
+                lines[rrn] = newLine;
+            } else {
+                while ((int)lines.size() <= rrn) lines.push_back("");
+                lines[rrn] = newLine;
+            }
+        } else {
+            rrn = (int)lines.size();
+            lines.push_back(newLine);
+        }
     }
 
     writeAllLines(appointmentDataFile, lines);
