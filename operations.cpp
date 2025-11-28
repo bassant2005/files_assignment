@@ -24,6 +24,7 @@ static void readLineField(const char* prompt, char* dest, size_t size) {
     safe_strcpy(dest, input.c_str(), size);
 }
 
+// Returns how many usable characters a slot currently stores after stripping delete flag.
 static size_t recordSlotCapacity(const vector<string> &lines, int rrn) {
     if (rrn < 0 || rrn >= (int)lines.size()) return 0;
     const string &line = lines[rrn];
@@ -32,6 +33,7 @@ static size_t recordSlotCapacity(const vector<string> &lines, int rrn) {
     return line.size();
 }
 
+// First-fit allocation strategy over the avail list.
 static int popFirstFitSlot(vector<int> &avail, const vector<string> &lines, size_t neededLen) {
     for (size_t i = 0; i < avail.size(); ++i) {
         int rrn = avail[i];
@@ -703,11 +705,12 @@ bool addDoctor(vector<PrimaryIndex> &primary,vector<SecondaryIndex> &secondary,v
     size_t neededLen = newLine.size();
     int rrn = -1;
 
-    // Prefer filling a leading blank line (happens if file started with newline)
+    // Prefer filling a leading blank line (legacy data files sometimes start with an empty line).
     if (!lines.empty() && lines[0].empty()) {
         rrn = 0;
         lines[0] = newLine;
     } else {
+        // Otherwise look for the first deleted slot that can fit this record.
         int slot = popFirstFitSlot(avail, lines, neededLen);
         if (slot != -1) {
             rrn = slot;
@@ -788,6 +791,7 @@ bool addAppointment(vector<PrimaryIndex> &primary,vector<SecondaryIndex> &second
         rrn = 0;
         lines[0] = newLine;
     } else {
+        // Apply first-fit policy on appointment avail slots.
         int slot = popFirstFitSlot(avail, lines, neededLen);
         if (slot != -1) {
             rrn = slot;
