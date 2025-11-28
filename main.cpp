@@ -123,8 +123,8 @@ int main(){
     vector<PrimaryIndex> apptPrimary = readPrimaryIndex(appointmentPrimaryIndexFile);
     vector<SecondaryIndex> apptSecondary = readSecondaryIndex(appointmentSecondaryIndexFile);
 
-    vector<int> doctorAvail;
-    vector<int> apptAvail;
+    vector<int> doctorAvail = buildAvailRRNsFromFile(doctorDataFile);
+    vector<int> apptAvail = buildAvailRRNsFromFile(appointmentDataFile);
 
     while(true){
         cout << "\n=== Main Menu ===\n";
