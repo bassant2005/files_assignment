@@ -11,6 +11,12 @@ using namespace std;
 
 const char DELETE_FLAG = '*';
 
+/**
+ * ===============================================================
+ *  HELPER FUNCTIONS
+ * ===============================================================
+ */
+
 // Safe copy helper: prevents buffer overflow
 void safe_strcpy(char* dest, const char* src, size_t size) {
     strncpy(dest, src, size - 1);

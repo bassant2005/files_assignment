@@ -199,6 +199,10 @@ int main(){
                 cout << "Appointment " << id << " not found\n";
             }
         } else if(choice == "9"){
+            cout << "Supported query examples:\n";
+            cout << "  Select all from Doctors where Doctor ID='xxx';\n";
+            cout << "  Select all from Appointments where Doctor ID='xxx';\n";
+            cout << "  Select Doctor Name from Doctors where Doctor Name='xxx';\n";
             cout << "Enter query: ";
             cin.ignore(numeric_limits<streamsize>::max(), '\n');
             string q; getline(cin, q);
