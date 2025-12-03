@@ -30,7 +30,6 @@ const string appointmentSecondaryIndexFile = "AppointmentSecondaryIndex.txt";
 struct PrimaryIndex {
     char recordID[20];
     int offset;
-    int recordLength;
 
     bool operator <(const PrimaryIndex& other) const {
         return strcmp(recordID, other.recordID) < 0;
