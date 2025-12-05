@@ -1,3 +1,14 @@
+/**
+ * this file is created by Bassant Tarek , id : 20231037
+ * this file has :
+ * 1- the btree node struct
+ * 2- read a node function
+ * 3- write a node function
+ * 4- int SearchARecord (Char* filename, int RecordID) implementation
+ * 5- void CreateIndexFileFile (Char* filename, int numberOfRecords, int m) implementation
+ * 6- void DisplayIndexFileContent (Char* filename) implementation
+ **/
+
 #include <bits/stdc++.h>
 using namespace std;
 
