@@ -1,0 +1,3 @@
+Select all from Doctors where Doctor ID=’xxx’;
+Select all from Appointments where Doctor ID=’xxx’;
+Select Doctor Name from Doctors where Doctor Name=’xxx’;
