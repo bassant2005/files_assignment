@@ -81,6 +81,11 @@ int countRefs(const BTreeNode& node) {
 int InsertNewRecordAtIndex(char* filename,int RecordID,int Reference){
     fstream file(filename, ios::in|ios::out|ios::binary);
     if(!file) return -1;
+    // Assignment requirement: leverage provided SearchARecord to avoid duplicates
+    if(SearchARecord(filename, RecordID) != -1){
+        cout << "Record " << RecordID << " already exists.\n";
+        return -1;
+    }
     // Read root (RRN 1)
     BTreeNode root = readNode(file,1);
     if(root.status==EMPTY_NODE){
@@ -658,38 +663,118 @@ void DeleteRecordFromIndex(char* filename, int RecordID) {
         cout << "Cannot open file.\n";
         return;
     }
-
-    // Phase 1: Find the record with path and child indices tracking
-    vector<int> path;
-    vector<int> childIndices;
-    int current = 1;
-    int leafRRN = -1;
-    int keyPos = -1;
-    BTreeNode leaf;
-
-    // Find leaf containing the key
-    leafRRN = findLeafForKey(file, RecordID, path, childIndices);
-
-    if(leafRRN == -1) {
+    // Assignment requirement: consult SearchARecord first to confirm existence
+    if(SearchARecord(filename, RecordID) == -1){
         cout << "Record " << RecordID << " not found.\n";
         file.close();
         return;
     }
 
-    // Read the leaf
-    leaf = readNode(file, leafRRN);
+    // Phase 1: Locate the key. If it lives in an internal node, descend into the
+    // child subtree that owns it (predecessor) and delete it from the leaf there,
+    // then update separators upward.
+    vector<int> path;
+    vector<int> childIndices;
+    int leafRRN = -1;
+    int keyPos = -1;
+    BTreeNode leaf;
 
-    // Find the key position in the leaf
-    keyPos = -1;
-    for(int i = 0; i < M; i++) {
-        if(leaf.keys[i] == RecordID) {
-            keyPos = i;
-            break;
+    int current = 1;
+    bool found = false;
+    while (true) {
+        BTreeNode node = readNode(file, current);
+        path.push_back(current);
+
+        // Check if the key exists in this node
+        int foundPos = -1;
+        for (int i = 0; i < M; i++) {
+            if (node.keys[i] == RecordID) { foundPos = i; break; }
         }
+
+        if (foundPos != -1) {
+            if (node.status == LEAF_NODE) {
+                // Key is in leaf; proceed
+                leafRRN = current;
+                keyPos = foundPos;
+                leaf = node;
+                found = true;
+                break;
+            } else {
+                // Key is in an internal node. We treat it as separator (max of a child).
+                int child = node.refs[foundPos];
+                if (child == -1) {
+                    // fallback: take the rightmost existing child not after foundPos
+                    for (int j = foundPos; j >= 0; --j) {
+                        if (node.refs[j] != -1) { child = node.refs[j]; foundPos = j; break; }
+                    }
+                }
+                if (child == -1) {
+                    cout << "Record " << RecordID << " not found.\n";
+                    file.close();
+                    return;
+                }
+                childIndices.push_back(foundPos);
+                current = child;
+                // Descend to rightmost leaf in that subtree (predecessor)
+                while (true) {
+                    BTreeNode sub = readNode(file, current);
+                    path.push_back(current);
+                    if (sub.status == LEAF_NODE) {
+                        leafRRN = current;
+                        leaf = sub;
+                        // In a max-key separator scheme, target is the max key in this leaf.
+                        keyPos = maxKeyInNode(sub) == RecordID ? countKeys(sub) - 1 : -1;
+                        // If not exact, find actual position (defensive).
+                        if (keyPos < 0) {
+                            for (int i = 0; i < M; i++) if (sub.keys[i] == RecordID) { keyPos = i; break; }
+                        }
+                        found = keyPos != -1;
+                        break;
+                    }
+                    // choose rightmost valid child to get predecessor
+                    int next = -1; int idx = -1;
+                    for (int j = M-1; j >= 0; --j) {
+                        if (sub.refs[j] != -1) { next = sub.refs[j]; idx = j; break; }
+                    }
+                    if (next == -1) {
+                        cout << "Record " << RecordID << " not found.\n";
+                        file.close();
+                        return;
+                    }
+                    childIndices.push_back(idx == -1 ? 0 : idx);
+                    current = next;
+                }
+                break;
+            }
+        }
+
+        // Not found in this node
+        if (node.status == LEAF_NODE) {
+            cout << "Record " << RecordID << " not found.\n";
+            file.close();
+            return;
+        }
+
+        // Choose child to continue search (first key >= RecordID, else rightmost)
+        int i = 0;
+        while (i < M && node.keys[i] != -1 && RecordID > node.keys[i]) i++;
+        int child = (i < M && node.refs[i] != -1) ? node.refs[i] : -1;
+        if (child == -1) {
+            for (int j = M-1; j >= 0; --j) {
+                if (node.refs[j] != -1) { child = node.refs[j]; i = j; break; }
+            }
+        }
+        if (child == -1) {
+            cout << "Record " << RecordID << " not found.\n";
+            file.close();
+            return;
+        }
+        childIndices.push_back(i);
+        current = child;
     }
 
-    if(keyPos == -1) {
-        cout << "Record " << RecordID << " not found in leaf.\n";
+    if(!found || leafRRN == -1 || keyPos == -1) {
+        cout << "Record " << RecordID << " not found.\n";
         file.close();
         return;
     }
@@ -828,19 +913,22 @@ int main() {
     cout<<"Search 24 -> "<<SearchARecord((char*)filename,24)<<"\n";
     cout<<"Search 99 -> "<<SearchARecord((char*)filename,99)<<"\n\n";
 
-    // Test deletion - deleting max key (24)
-    cout<<"Delete: 24 (this is a max key in its node)\n";
+    // Explicit internal-deletion test: after the first split, 24 sits as a separator in the root.
+    // Deleting 24 exercises internal deletion + separator updates.
+    cout<<"Internal delete (root separator): 24\n";
     DeleteRecordFromIndex((char*)filename,24);
-    cout<<"\nAfter deleting 24:\n";
+    cout<<"\nAfter internal delete of 24:\n";
     DisplayIndexFileContent((char*)filename);
     cout<<"\n";
 
-    // Test deleting another max key
+    // Test deleting another key (likely still a separator after prior ops)
     cout<<"Delete: 19\n";
     DeleteRecordFromIndex((char*)filename,19);
     cout<<"\nAfter deleting 19:\n";
     DisplayIndexFileContent((char*)filename);
     cout<<"\n";
+
+    DeleteRecordFromIndex((char*)filename,19);
 
     // Test deleting non-max key
     cout<<"Delete: 7\n";
