@@ -78,6 +78,90 @@ int countRefs(const BTreeNode& node) {
     }
     return count;
 }
+// Helper function for InsertNewRecordAtIndex
+bool insertIntoInternal(fstream &file,int parentRRN,int newKey,int newChildRRN,vector<int> &path){
+    BTreeNode parent = readNode(file, parentRRN);
+
+    // collect entries
+    vector<pair<int,int>> entries;
+    for(int i=0;i<M;i++){
+        if(parent.keys[i]!=-1)
+            entries.push_back({parent.keys[i], parent.refs[i]});
+    }
+    entries.push_back({newKey, newChildRRN});
+
+    sort(entries.begin(), entries.end());
+
+    // Case 1: parent has room
+    if(entries.size() <= M){
+        parent.keys.assign(M,-1);
+        parent.refs.assign(M,-1);
+        for(int i=0;i<entries.size();i++){
+            parent.keys[i] = entries[i].first;
+            parent.refs[i] = entries[i].second;
+        }
+        writeNode(file,parent);
+        return true;
+    }
+
+    // Case 2: parent overflow → split
+    int mid = entries.size()/2; // 3
+
+    int promotedKey = entries[mid].first;
+    int promotedRef = entries[mid].second;
+
+    // left internal (reuse parent)
+    parent.keys.assign(M,-1);
+    parent.refs.assign(M,-1);
+    for(int i=0;i<mid;i++){
+        parent.keys[i] = entries[i].first;
+        parent.refs[i] = entries[i].second;
+    }
+    writeNode(file,parent);
+
+    // right internal
+    int newRRN = allocateFreeNode(file);
+    if(newRRN==-1) return false;
+
+    BTreeNode right;
+    right.selfRRN = newRRN;
+    right.status = INTERNAL_NODE;
+    right.keys.assign(M,-1);
+    right.refs.assign(M,-1);
+
+    int idx=0;
+    for(int i=mid+1;i<entries.size();i++){
+        right.keys[idx] = entries[i].first;
+        right.refs[idx] = entries[i].second;
+        idx++;
+    }
+    writeNode(file,right);
+
+    // if parent was root
+    if(parentRRN == 1){
+        BTreeNode newRoot;
+        newRoot.selfRRN = 1;
+        newRoot.status = INTERNAL_NODE;
+        newRoot.keys.assign(M,-1);
+        newRoot.refs.assign(M,-1);
+
+        newRoot.keys[0] = maxKeyInNode(parent);
+        newRoot.keys[1] = maxKeyInNode(right);
+        newRoot.refs[0] = parentRRN;
+        newRoot.refs[1] = newRRN;
+
+        writeNode(file,newRoot);
+        return true;
+    }
+
+    // propagate upward
+    path.pop_back(); // remove parent
+    int grandParent = path.back();
+
+    return insertIntoInternal(file, grandParent, promotedKey, newRRN, path);
+}
+
+/// ----------------- Complete InsertNewRecordAtIndex Function -----------------
 int InsertNewRecordAtIndex(char* filename,int RecordID,int Reference){
     fstream file(filename, ios::in|ios::out|ios::binary);
     if(!file) return -1;
@@ -194,7 +278,12 @@ int InsertNewRecordAtIndex(char* filename,int RecordID,int Reference){
                     parent.keys[i] = pentries[i].first;
                     parent.refs[i] = pentries[i].second;
                 }
-                writeNode(file,parent);
+
+                if(countKeys(parent) < M){
+                    writeNode(file,parent);
+                } else {
+                    insertIntoInternal(file, parentRRN,maxKeyInNode(newLeaf),newLeaf.selfRRN,path);
+                }
 
                 file.close();
                 return newLeaf.selfRRN;
