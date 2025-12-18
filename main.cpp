@@ -1,7 +1,7 @@
 #include "operation.cpp"
+#include <limits>
 
-void TestIndexOperations(const char* filename)
-{
+void TestIndexOperations(const char* filename) {
     // ----------- Inserts -----------
     InsertNewRecordAtIndex((char*)filename, 3, 12);
     InsertNewRecordAtIndex((char*)filename, 7, 24);
@@ -13,7 +13,6 @@ void TestIndexOperations(const char* filename)
     DisplayIndexFileContent((char*)filename);
 
     InsertNewRecordAtIndex((char*)filename, 19, 84);
-
     cout << "\n--- Display after inserting (19,84) ---\n";
     DisplayIndexFileContent((char*)filename);
 
@@ -26,7 +25,6 @@ void TestIndexOperations(const char* filename)
     DisplayIndexFileContent((char*)filename);
 
     InsertNewRecordAtIndex((char*)filename, 2, 144);
-
     cout << "\n--- Display after inserting (2,144) ---\n";
     DisplayIndexFileContent((char*)filename);
 
@@ -42,7 +40,6 @@ void TestIndexOperations(const char* filename)
     DisplayIndexFileContent((char*)filename);
 
     InsertNewRecordAtIndex((char*)filename, 32, 240);
-
     cout << "\n--- Display after inserting (32,240) ---\n";
     DisplayIndexFileContent((char*)filename);
 
@@ -62,18 +59,138 @@ void TestIndexOperations(const char* filename)
     cout << "\n--- Display after deleting key 8 ---\n";
     DisplayIndexFileContent((char*)filename);
 }
+void manualOperations(const char* filename) {
+    int choice;
+    int recordID, reference;
 
-int main()
-{
+    while (true) {
+        cout << "\n=== Manual B-tree Operations ===\n";
+        cout << "1. Insert a record\n";
+        cout << "2. Delete a record\n";
+        cout << "3. Search for a record\n";
+        cout << "4. Display B-tree\n";
+        cout << "5. Return to main menu\n";
+        cout << "Enter your choice (1-5): ";
+
+        if (!(cin >> choice)) {
+            cout << "Invalid input. Please enter a number.\n";
+            cin.clear();
+            cin.ignore(numeric_limits<streamsize>::max(), '\n');
+            continue;
+        }
+
+        switch (choice) {
+            case 1: // Insert
+                cout << "Enter Record ID (integer): ";
+                if (!(cin >> recordID)) {
+                    cout << "Invalid Record ID.\n";
+                    cin.clear();
+                    cin.ignore(numeric_limits<streamsize>::max(), '\n');
+                    break;
+                }
+                cout << "Enter Reference (integer): ";
+                if (!(cin >> reference)) {
+                    cout << "Invalid Reference.\n";
+                    cin.clear();
+                    cin.ignore(numeric_limits<streamsize>::max(), '\n');
+                    break;
+                }
+                InsertNewRecordAtIndex((char*)filename, recordID, reference);
+                cout << "Insert operation completed.\n";
+                break;
+
+            case 2: // Delete
+                cout << "Enter Record ID to delete: ";
+                if (!(cin >> recordID)) {
+                    cout << "Invalid Record ID.\n";
+                    cin.clear();
+                    cin.ignore(numeric_limits<streamsize>::max(), '\n');
+                    break;
+                }
+                DeleteRecordFromIndex((char*)filename, recordID);
+                cout << "Delete operation completed.\n";
+                break;
+
+            case 3: // Search
+                cout << "Enter Record ID to search: ";
+                if (!(cin >> recordID)) {
+                    cout << "Invalid Record ID.\n";
+                    cin.clear();
+                    cin.ignore(numeric_limits<streamsize>::max(), '\n');
+                    break;
+                }
+                // Note: You'll need to implement a search function in operation.cpp
+                // For now, we'll just display the tree
+                cout << "Search functionality would go here.\n";
+                break;
+
+            case 4: // Display
+                cout << "\n--- Current B-tree Structure ---\n";
+                DisplayIndexFileContent((char*)filename);
+                break;
+
+            case 5: // Return to main menu
+                return;
+
+            default:
+                cout << "Invalid choice. Please try again.\n";
+        }
+
+        // Clear any remaining input
+        cin.ignore(numeric_limits<streamsize>::max(), '\n');
+    }
+}
+
+int main() {
     const char filename[] = "IndexFile.bin";
-    int numberOfNodes = 10;
-
+    int choice;
+    
     // Create initial file
+    int numberOfNodes = 10;
     CreateIndexFile((char*)filename, numberOfNodes);
-    cout<<"Empty B-Tree file created.\n\n";
-
-    cout<<"Initial B-Tree index file content:\n";
-    DisplayIndexFileContent((char*)filename);
-
-    TestIndexOperations(filename);
+    cout << "Empty B-Tree file created.\n\n";
+    
+    while (true) {
+        cout << "\n=== B-tree Operations Menu ===\n";
+        cout << "1. Run Test Operations\n";
+        cout << "2. Manual Operations\n";
+        cout << "3. Display Current B-tree\n";
+        cout << "4. Exit\n";
+        cout << "Enter your choice (1-4): ";
+        
+        if (!(cin >> choice)) {
+            cout << "Invalid input. Please enter a number.\n";
+            cin.clear();
+            cin.ignore(numeric_limits<streamsize>::max(), '\n');
+            continue;
+        }
+        
+        switch (choice) {
+            case 1: // Run test operations
+                cout << "\n=== Running Test Operations ===\n";
+                TestIndexOperations(filename);
+                break;
+                
+            case 2: // Manual operations
+                manualOperations(filename);
+                break;
+                
+            case 3: // Display current B-tree
+                cout << "\n--- Current B-tree Structure ---\n";
+                DisplayIndexFileContent((char*)filename);
+                break;
+                
+            case 4: // Exit
+                cout << "Exiting program.\n";
+                return 0;
+                
+            default:
+                cout << "Invalid choice. Please try again.\n";
+        }
+        
+        // Clear any remaining input
+        cin.ignore(numeric_limits<streamsize>::max(), '\n');
+    }
+    
+    return 0;
 }
