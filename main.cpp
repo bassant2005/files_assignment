@@ -119,9 +119,12 @@ void manualOperations(const char* filename) {
                     cin.ignore(numeric_limits<streamsize>::max(), '\n');
                     break;
                 }
-                // Note: You'll need to implement a search function in operation.cpp
-                // For now, we'll just display the tree
-                cout << "Search functionality would go here.\n";
+                reference = SearchARecord((char*)filename, recordID);
+                if (reference != -1) {
+                    cout << "Record found! Reference: " << reference << endl;
+                } else {
+                    cout << "Record not found.\n";
+                }
                 break;
 
             case 4: // Display
