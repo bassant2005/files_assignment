@@ -399,35 +399,27 @@ int findLeafForKey(fstream &file, int key, vector<int> &path, vector<int> &child
 }
 
 /// ----------------- Update parent separator keys -----------------
-void updateParentSeparators(fstream& file, int leafRRN, int deletedKey,const vector<int>& path, const vector<int>& childIndices) {
-    if (path.size() <= 1) return; // No parent
-
-    // Check all ancestors to see if they contain the deleted key as separator
+void updateParentSeparators(fstream& file,int leafRRN,int deletedKey,const vector<int>& path,const vector<int>& childIndices) {
+    // Start from parent of the leaf and go upward
     for (int level = path.size() - 2; level >= 0; level--) {
         int parentRRN = path[level];
         int childIndex = childIndices[level];
 
         BTreeNode parent = readNode(file, parentRRN);
 
-        // Check if parent has the deleted key as a separator
-        if (childIndex > 0 && childIndex <= M) {
-            // For B+ tree style, parent keys are usually max of left child
-            // But in B-tree, they're separator keys
-            for (int i = 0; i < M; i++) {
-                if (parent.keys[i] == deletedKey) {
-                    // We need to find the new max in the child
-                    int childRRN = parent.refs[childIndex];
-                    BTreeNode child = readNode(file, childRRN);
-                    int newMax = maxKeyInNode(child);
+        int childRRN = parent.refs[childIndex];
+        if (childRRN == -1) return;
 
-                    if (newMax != -1) {
-                        parent.keys[i] = newMax;
-                        writeNode(file, parent);
-                    }
-                    break;
-                }
-            }
-        }
+        BTreeNode child = readNode(file, childRRN);
+        int newMax = maxKeyInNode(child);
+
+        if (newMax == -1) return;
+
+        // If separator didn't change, stop propagating
+        if (parent.keys[childIndex] == newMax) return;
+
+        parent.keys[childIndex] = newMax;
+        writeNode(file, parent);
     }
 }
 
@@ -1035,3 +1027,4 @@ void DeleteRecordFromIndex(char* filename, int RecordID) {
 //
 //    return 0;
 //}
+
