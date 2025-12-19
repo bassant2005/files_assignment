@@ -81,7 +81,7 @@ int findLeafForKey(fstream &file, int key, vector<int> &path, vector<int> &child
             return current;
 
         // find first key greater than or equal to target
-        // In B+ tree, keys are max values of subtrees, so we traverse right until key > separator
+        // keys are max values of subtrees, so we traverse right until key > separator
         int i = 0;
         while (i < M && node.keys[i] != -1 && key > node.keys[i]) i++;
 
@@ -215,7 +215,7 @@ void mergeWithLeftSibling(fstream& file, BTreeNode& node, BTreeNode& parent, int
         leftSibling.keys[leftKeyCount + i] = node.keys[i];
         leftSibling.refs[leftKeyCount + i] = node.refs[i];
     }
-    // In B+ tree, parent.keys[i] is the max key in subtree at parent.refs[i]
+    // parent.keys[i] is the max key in subtree at parent.refs[i]
     // After merging node into leftSibling:
     //  Update keys[nodePosInParent-1] to be max of merged leftSibling
     //  Remove keys[nodePosInParent] and shift keys left
@@ -252,7 +252,7 @@ void mergeWithRightSibling(fstream& file, BTreeNode& node, BTreeNode& parent, in
         node.keys[nodeKeyCount + i] = rightSibling.keys[i];
         node.refs[nodeKeyCount + i] = rightSibling.refs[i];
     }
-    // In B+ tree, parent.keys[i] is the max key in subtree at parent.refs[i]
+    // parent.keys[i] is the max key in subtree at parent.refs[i]
     // After merging rightSibling into node:
     // Update keys[nodePosInParent] to be max of merged node
     // Remove keys[nodePosInParent+1] (the key for rightSibling) and shift keys left
@@ -260,7 +260,6 @@ void mergeWithRightSibling(fstream& file, BTreeNode& node, BTreeNode& parent, in
 
     // Update the key for node (now contains merged data)
     parent.keys[nodePosInParent] = maxKeyInNode(node);
-    //cout << "Updated parent key at index " << nodePosInParent << " to " << maxKeyInNode(node) << " (max of merged node)" << endl;
 
     // Remove key and reference for the right sibling, then shift
     for(int i = nodePosInParent+1; i < M-1; i++) {
