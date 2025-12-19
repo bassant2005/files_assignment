@@ -79,87 +79,96 @@ int countRefs(const BTreeNode& node) {
     return count;
 }
 // Helper function for InsertNewRecordAtIndex
-bool insertIntoInternal(fstream &file,int parentRRN,int newKey,int newChildRRN,vector<int> &path){
+bool insertIntoInternal(fstream &file, int parentRRN, int upKey, int upRef, vector<int> &path) {
     BTreeNode parent = readNode(file, parentRRN);
 
-    // collect entries
-    vector<pair<int,int>> entries;
-    for(int i=0;i<M;i++){
-        if(parent.keys[i]!=-1)
-            entries.push_back({parent.keys[i], parent.refs[i]});
-    }
-    entries.push_back({newKey, newChildRRN});
-
-    sort(entries.begin(), entries.end());
-
-    // Case 1: parent has room
-    if(entries.size() <= M){
-        parent.keys.assign(M,-1);
-        parent.refs.assign(M,-1);
-        for(int i=0;i<entries.size();i++){
-            parent.keys[i] = entries[i].first;
-            parent.refs[i] = entries[i].second;
+    // 1. Collect existing data to find insertion point
+    vector<int> tempKeys;
+    vector<int> tempRefs;
+    for (int i = 0; i < 5; i++) {
+        if (parent.keys[i] != -1) {
+            tempKeys.push_back(parent.keys[i]);
+            tempRefs.push_back(parent.refs[i]);
         }
-        writeNode(file,parent);
+    }
+
+    // Insert the new separator (the min key of the new right child)
+    auto it = lower_bound(tempKeys.begin(), tempKeys.end(), upKey);
+    int pos = distance(tempKeys.begin(), it);
+    tempKeys.insert(it, upKey);
+    tempRefs.insert(tempRefs.begin() + pos, upRef);
+
+    // Case 1: Room available
+    if (tempKeys.size() <= 5) {
+        parent.keys.assign(5, -1);
+        parent.refs.assign(5, -1);
+        for (int i = 0; i < tempKeys.size(); i++) {
+            parent.keys[i] = tempKeys[i];
+            parent.refs[i] = tempRefs[i];
+        }
+        writeNode(file, parent);
         return true;
     }
 
-    // Case 2: parent overflow → split
-    int mid = entries.size()/2; // 3
-
-    int promotedKey = entries[mid].first;
-    int promotedRef = entries[mid].second;
-
-    // left internal (reuse parent)
-    parent.keys.assign(M,-1);
-    parent.refs.assign(M,-1);
-    for(int i=0;i<mid;i++){
-        parent.keys[i] = entries[i].first;
-        parent.refs[i] = entries[i].second;
-    }
-    writeNode(file,parent);
-
-    // right internal
+    // Case 2: Split Internal Node
+    int mid = tempKeys.size() / 2;
+    int promotedKey = tempKeys[mid];
     int newRRN = allocateFreeNode(file);
-    if(newRRN==-1) return false;
+    BTreeNode rightChild;
+    rightChild.selfRRN = allocateFreeNode(file);
+    rightChild.status = 1; // Internal
 
-    BTreeNode right;
-    right.selfRRN = newRRN;
-    right.status = INTERNAL_NODE;
-    right.keys.assign(M,-1);
-    right.refs.assign(M,-1);
-
-    int idx=0;
-    for(int i=mid+1;i<entries.size();i++){
-        right.keys[idx] = entries[i].first;
-        right.refs[idx] = entries[i].second;
-        idx++;
+    for (int i = mid, j = 0; i < tempKeys.size(); i++, j++) {
+        rightChild.keys[j] = tempKeys[i];
+        rightChild.refs[j] = tempRefs[i];
     }
-    writeNode(file,right);
+    writeNode(file, rightChild);
 
-    // if parent was root
-    if(parentRRN == 1){
+    // Update current parent (Left Side)
+    parent.keys.assign(5, -1);
+    parent.refs.assign(5, -1);
+    for (int i = 0; i < mid; i++) {
+        parent.keys[i] = tempKeys[i];
+        parent.refs[i] = tempRefs[i];
+    }
+    writeNode(file, parent);
+
+    int nextUpKey = rightChild.keys[0]; // Promote the first key of the new node
+    int nextUpRef = rightChild.selfRRN;
+
+    // Special Case: Split Root (RRN 1)
+    if (parentRRN == 1) {
+        // 1. Move old root (left side) to a new free RRN
+        int leftRRN = allocateFreeNode(file);
+        parent.selfRRN = leftRRN;
+        writeNode(file, parent);
+
+        // 2. Right side is already at newRRN from your split logic
+
+        // 3. Re-initialize RRN 1 as the new root pointing to both
         BTreeNode newRoot;
         newRoot.selfRRN = 1;
-        newRoot.status = INTERNAL_NODE;
-        newRoot.keys.assign(M,-1);
-        newRoot.refs.assign(M,-1);
+        newRoot.status = 1; // INTERNAL_NODE
+        newRoot.keys.assign(5, -1);
+        newRoot.refs.assign(5, -1);
 
-        newRoot.keys[0] = maxKeyInNode(parent);
-        newRoot.keys[1] = maxKeyInNode(right);
-        newRoot.refs[0] = parentRRN;
+        // Root Key 0: Min key of left child (was parent)
+        newRoot.keys[0] = parent.keys[0];
+        newRoot.refs[0] = leftRRN;
+
+        // Root Key 1: Min key of right child (promotedKey)
+        newRoot.keys[1] = promotedKey;
         newRoot.refs[1] = newRRN;
 
-        writeNode(file,newRoot);
+        writeNode(file, newRoot);
         return true;
     }
 
-    // propagate upward
-    path.pop_back(); // remove parent
-    int grandParent = path.back();
 
-    return insertIntoInternal(file, grandParent, promotedKey, newRRN, path);
+    path.pop_back();
+    return insertIntoInternal(file, path.back(), nextUpKey, nextUpRef, path);
 }
+
 
 /// ----------------- Complete InsertNewRecordAtIndex Function -----------------
 int InsertNewRecordAtIndex(char* filename,int RecordID,int Reference){
@@ -270,7 +279,7 @@ int InsertNewRecordAtIndex(char* filename,int RecordID,int Reference){
                 // update parent
                 vector<pair<int,int>> pentries;
                 for(int i=0;i<M;i++) if(parent.keys[i]!=-1) pentries.emplace_back(parent.keys[i], parent.refs[i]);
-                pentries.emplace_back(maxKeyInNode(newLeaf), newLeaf.selfRRN);
+                pentries.emplace_back(newLeaf.keys[0], newLeaf.selfRRN);
                 sort(pentries.begin(), pentries.end(), [](const pair<int,int>& a, const pair<int,int>& b){ return a.first < b.first; });
                 parent.keys.assign(M, -1);
                 parent.refs.assign(M, -1);
@@ -332,12 +341,10 @@ int InsertNewRecordAtIndex(char* filename,int RecordID,int Reference){
             }
         }
         else {
-            int next = -1;
-            for(int i=0;i<M;i++){
-                if(node.refs[i]!=-1){next=node.refs[i];break;}
-            }
-            if(next==-1){file.close();return -1;}
-            current = next;
+            int i=0;
+            while(i<M && node.keys[i]!=-1 && RecordID >= node.keys[i]) i++;
+            current = node.refs[i];
+
         }
     }
 
@@ -714,7 +721,7 @@ void fixUnderflow(fstream& file, int nodeRRN, vector<int>& path, vector<int>& ch
         writeNode(file, node);
         writeNode(file, parent);
 
-        // Check if parent is now underfull or if root has only 1 child
+        // Check if root has only 1 child
         if(parentRRN == 1) {
             // If root has only 1 child, promote that child to root
             int childCount = countRefs(parent);
