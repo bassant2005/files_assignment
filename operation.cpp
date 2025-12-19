@@ -751,7 +751,7 @@ void DeleteRecordFromIndex(char* filename, int RecordID) {
         cout << "Cannot open file.\n";
         return;
     }
-    // Assignment requirement: consult SearchARecord first to confirm existence
+    // consult SearchARecord first to confirm existence
     if(SearchARecord(filename, RecordID) == -1){
         cout << "Record " << RecordID << " not found.\n";
         file.close();
@@ -965,66 +965,5 @@ void DeleteRecordFromIndex(char* filename, int RecordID) {
     file.close();
     cout << "Deletion process completed.\n";
 }
-///// ================== TESTING MAIN ==================
-//int main() {
-//    const char filename[] = "btree_test_H.bin";
-//    int numberOfNodes = 10;
-//
-//    // Create initial file
-//    CreateIndexFile((char*)filename, numberOfNodes);
-//    cout<<"Empty B-Tree file created.\n\n";
-//
-//    cout<<"Initial B-Tree index file content:\n";
-//    DisplayIndexFileContent((char*)filename);
-//    cout<<"\n";
-//
-//    // Insert test data
-//    int inserts[][2]={{3,12},{7,24},{10,48},{24,60},{14,72}};
-//    for(auto &p: inserts){
-//        int res=InsertNewRecordAtIndex((char*)filename,p[0],p[1]);
-//        cout<<"Insert ("<<p[0]<<","<<p[1]<<") -> res = "<<res<<"\n";
-//    }
-//    cout<<"\nAfter first batch of inserts:\n";
-//    DisplayIndexFileContent((char*)filename);
-//    cout<<"\n";
-//
-//    // Insert more to cause splitting
-//    int r=InsertNewRecordAtIndex((char*)filename,19,84);
-//    cout<<"Insert (19,84) -> res = "<<r<<"\n\n";
-//    cout<<"After inserting 19,84:\n";
-//    DisplayIndexFileContent((char*)filename);
-//    cout<<"\n";
-//
-//    // Test search
-//    cout<<"Search tests:\n";
-//    cout<<"Search 10 -> "<<SearchARecord((char*)filename,10)<<"\n";
-//    cout<<"Search 24 -> "<<SearchARecord((char*)filename,24)<<"\n";
-//    cout<<"Search 99 -> "<<SearchARecord((char*)filename,99)<<"\n\n";
-//
-//    // Explicit internal-deletion test: after the first split, 24 sits as a separator in the root.
-//    // Deleting 24 exercises internal deletion + separator updates.
-//    cout<<"Internal delete (root separator): 24\n";
-//    DeleteRecordFromIndex((char*)filename,24);
-//    cout<<"\nAfter internal delete of 24:\n";
-//    DisplayIndexFileContent((char*)filename);
-//    cout<<"\n";
-//
-//    // Test deleting another key (likely still a separator after prior ops)
-//    cout<<"Delete: 19\n";
-//    DeleteRecordFromIndex((char*)filename,19);
-//    cout<<"\nAfter deleting 19:\n";
-//    DisplayIndexFileContent((char*)filename);
-//    cout<<"\n";
-//
-//    DeleteRecordFromIndex((char*)filename,19);
-//
-//    // Test deleting non-max key
-//    cout<<"Delete: 7\n";
-//    DeleteRecordFromIndex((char*)filename,7);
-//    cout<<"\nAfter deleting 7:\n";
-//    DisplayIndexFileContent((char*)filename);
-//    cout<<"\n";
-//
-//    return 0;
-//}
+
 
