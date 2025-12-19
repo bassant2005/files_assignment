@@ -1,4 +1,4 @@
-#include "operation.cpp"
+#include "Btree_deletion.cpp"
 #include <limits>
 
 void TestIndexOperations(const char* filename) {
@@ -16,7 +16,7 @@ void TestIndexOperations(const char* filename) {
     cout << "\n--- Display after inserting (19,84) ---\n";
     DisplayIndexFileContent((char*)filename);
 
-    InsertNewRecordAtIndex((char*)filename, 30, 96);
+    InsertNewRecordAtIndex((char*)filename, 30, 196);
     InsertNewRecordAtIndex((char*)filename, 15, 108);
     InsertNewRecordAtIndex((char*)filename, 1, 120);
     InsertNewRecordAtIndex((char*)filename, 5, 132);
