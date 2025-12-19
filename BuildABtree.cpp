@@ -13,7 +13,7 @@
 using namespace std;
 
 /// 5 keys, 5 references, 1 status
-const int rowSize = 12;
+const int rowSize = 11;
 
 /// BTreeNode structure
 struct BTreeNode {
