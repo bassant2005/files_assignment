@@ -1,37 +1,15 @@
 #include "BuildABtree.cpp"
+#include "Btree_Insertion.cpp"
 /**
  * this file is created by Habeba Hossam , id : 20230117
  * Includes free-list helpers so leaf operations work standalone
  * int InsertNewRecordAtIndex (Char* filename, int RecordID, int Reference)
  * void DeleteRecordFromIndex (Char* filename, int RecordID)
  **/
-const int M = 5;
 const int EMPTY_NODE = -1;
 const int LEAF_NODE = 0;
-const int INTERNAL_NODE = 1;
 
 /// ----------------- Free List Helpers -----------------
-
-// Pop first free node from free list
-int allocateFreeNode(fstream &file) {
-    vector<int> row0(rowSize, -1);
-    file.seekg(0, ios::beg);
-    file.read(reinterpret_cast<char*>(row0.data()), rowSize * sizeof(int));
-    int firstFree = row0[1];
-    if (firstFree == -1) return -1; // no free nodes
-
-    vector<int> freerow(rowSize, -1);
-    file.seekg(firstFree * rowSize * sizeof(int), ios::beg);
-    file.read(reinterpret_cast<char*>(freerow.data()), rowSize * sizeof(int));
-    int nextFree = freerow[1];
-
-    row0[1] = nextFree;
-    file.seekp(0, ios::beg);
-    file.write(reinterpret_cast<char*>(row0.data()), rowSize * sizeof(int));
-    file.flush();
-
-    return firstFree;
-}
 
 // Return RRN to free list
 void releaseNodeToFreeList(fstream &file, int rrn) {
@@ -78,277 +56,7 @@ int countRefs(const BTreeNode& node) {
     }
     return count;
 }
-// Helper function for InsertNewRecordAtIndex
-bool insertIntoInternal(fstream &file, int parentRRN, int upKey, int upRef, vector<int> &path) {
-    BTreeNode parent = readNode(file, parentRRN);
 
-    // 1. Collect existing data to find insertion point
-    vector<int> tempKeys;
-    vector<int> tempRefs;
-    for (int i = 0; i < 5; i++) {
-        if (parent.keys[i] != -1) {
-            tempKeys.push_back(parent.keys[i]);
-            tempRefs.push_back(parent.refs[i]);
-        }
-    }
-
-    // Insert the new separator (the min key of the new right child)
-    auto it = lower_bound(tempKeys.begin(), tempKeys.end(), upKey);
-    int pos = distance(tempKeys.begin(), it);
-    tempKeys.insert(it, upKey);
-    tempRefs.insert(tempRefs.begin() + pos, upRef);
-
-    // Case 1: Room available
-    if (tempKeys.size() <= 5) {
-        parent.keys.assign(5, -1);
-        parent.refs.assign(5, -1);
-        for (int i = 0; i < tempKeys.size(); i++) {
-            parent.keys[i] = tempKeys[i];
-            parent.refs[i] = tempRefs[i];
-        }
-        writeNode(file, parent);
-        return true;
-    }
-
-    // Case 2: Split Internal Node
-    int mid = tempKeys.size() / 2;
-    int promotedKey = tempKeys[mid];
-    int newRRN = allocateFreeNode(file);
-    BTreeNode rightChild;
-    rightChild.selfRRN = allocateFreeNode(file);
-    rightChild.status = 1; // Internal
-
-    for (int i = mid, j = 0; i < tempKeys.size(); i++, j++) {
-        rightChild.keys[j] = tempKeys[i];
-        rightChild.refs[j] = tempRefs[i];
-    }
-    writeNode(file, rightChild);
-
-    // Update current parent (Left Side)
-    parent.keys.assign(5, -1);
-    parent.refs.assign(5, -1);
-    for (int i = 0; i < mid; i++) {
-        parent.keys[i] = tempKeys[i];
-        parent.refs[i] = tempRefs[i];
-    }
-    writeNode(file, parent);
-
-    int nextUpKey = rightChild.keys[0]; // Promote the first key of the new node
-    int nextUpRef = rightChild.selfRRN;
-
-    // Special Case: Split Root (RRN 1)
-    if (parentRRN == 1) {
-        // 1. Move old root (left side) to a new free RRN
-        int leftRRN = allocateFreeNode(file);
-        parent.selfRRN = leftRRN;
-        writeNode(file, parent);
-
-        // 2. Right side is already at newRRN from your split logic
-
-        // 3. Re-initialize RRN 1 as the new root pointing to both
-        BTreeNode newRoot;
-        newRoot.selfRRN = 1;
-        newRoot.status = 1; // INTERNAL_NODE
-        newRoot.keys.assign(5, -1);
-        newRoot.refs.assign(5, -1);
-
-        // Root Key 0: Min key of left child (was parent)
-        newRoot.keys[0] = parent.keys[0];
-        newRoot.refs[0] = leftRRN;
-
-        // Root Key 1: Min key of right child (promotedKey)
-        newRoot.keys[1] = promotedKey;
-        newRoot.refs[1] = newRRN;
-
-        writeNode(file, newRoot);
-        return true;
-    }
-
-
-    path.pop_back();
-    return insertIntoInternal(file, path.back(), nextUpKey, nextUpRef, path);
-}
-
-
-/// ----------------- Complete InsertNewRecordAtIndex Function -----------------
-int InsertNewRecordAtIndex(char* filename,int RecordID,int Reference){
-    fstream file(filename, ios::in|ios::out|ios::binary);
-    if(!file) return -1;
-    // Assignment requirement: leverage provided SearchARecord to avoid duplicates
-    if(SearchARecord(filename, RecordID) != -1){
-        cout << "Record " << RecordID << " already exists.\n";
-        return -1;
-    }
-    // Read root (RRN 1)
-    BTreeNode root = readNode(file,1);
-    if(root.status==EMPTY_NODE){
-        // Initializing the tree: remove RRN 1 from free list
-        vector<int> header(rowSize, -1);
-        file.seekg(0, ios::beg);
-        file.read(reinterpret_cast<char*>(header.data()), rowSize*sizeof(int));
-        int head = header[1]; // should be 1
-        if(head == 1){
-            vector<int> freeRow(rowSize, -1);
-            file.seekg(1 * rowSize * sizeof(int), ios::beg);
-            file.read(reinterpret_cast<char*>(freeRow.data()), rowSize*sizeof(int));
-            header[1] = freeRow[1];
-            file.seekp(0, ios::beg);
-            file.write(reinterpret_cast<char*>(header.data()), rowSize*sizeof(int));
-            file.flush();
-        }
-        // Initialize root as leaf
-        root.selfRRN = 1;
-        root.status = LEAF_NODE;
-        root.keys.assign(M, -1);
-        root.refs.assign(M, -1);
-        root.keys[0] = RecordID;
-        root.refs[0] = Reference;
-        writeNode(file,root);
-        file.close();
-        return 1;
-    }
-
-// Find leaf (store path)
-    int current = 1;
-    vector<int> path;
-    while(true){
-        BTreeNode node = readNode(file,current);
-        path.push_back(current);
-        // count keys in the leaf node
-        if(node.status == LEAF_NODE){
-            int cnt = 0;
-            while(cnt < M && node.keys[cnt] != -1) cnt++;
-
-            // Case A: leaf has room
-            if(cnt < M){
-                int pos = 0;
-                while(pos < cnt && node.keys[pos] < RecordID) pos++;
-                for(int i = cnt; i > pos; --i){
-                    node.keys[i] = node.keys[i-1];
-                    node.refs[i] = node.refs[i-1];
-                }
-                node.keys[pos] = RecordID;
-                node.refs[pos] = Reference;
-                writeNode(file,node);
-                file.close();
-                return node.selfRRN;
-            }
-
-            // Case B: leaf full -> split
-            vector<pair<int,int>> entries;
-            for(int i=0;i<M;i++) entries.push_back({node.keys[i], node.refs[i]});
-            entries.push_back({RecordID, Reference});
-            sort(entries.begin(), entries.end(), [](const pair<int,int>& a, const pair<int,int>& b){
-                return a.first < b.first;
-            });
-
-            // left 3, right 3
-            int leftSize = 3;
-            int rightSize = (int)entries.size() - leftSize;
-
-            // if parent exists, normal leaf split
-            if(path.size() >= 2){
-                int parentRRN = path[path.size()-2];
-                BTreeNode parent = readNode(file,parentRRN);
-
-                // create left leaf (reuse current node)
-                node.keys.assign(M, -1);
-                node.refs.assign(M, -1);
-                for(int i=0;i<leftSize;i++){
-                    node.keys[i] = entries[i].first;
-                    node.refs[i] = entries[i].second;
-                }
-
-                // create right leaf
-                int newRRN = allocateFreeNode(file);
-                if(newRRN == -1){ file.close(); return -1; }
-                BTreeNode newLeaf;
-                newLeaf.selfRRN = newRRN;
-                newLeaf.status = LEAF_NODE;
-                newLeaf.keys.assign(M, -1);
-                newLeaf.refs.assign(M, -1);
-                for(int i=0;i<rightSize;i++){
-                    newLeaf.keys[i] = entries[leftSize + i].first;
-                    newLeaf.refs[i] = entries[leftSize + i].second;
-                }
-
-                // write leaves Update file with both leaf nodes
-                writeNode(file,node);
-                writeNode(file,newLeaf);
-
-                // update parent
-                vector<pair<int,int>> pentries;
-                for(int i=0;i<M;i++) if(parent.keys[i]!=-1) pentries.emplace_back(parent.keys[i], parent.refs[i]);
-                pentries.emplace_back(newLeaf.keys[0], newLeaf.selfRRN);
-                sort(pentries.begin(), pentries.end(), [](const pair<int,int>& a, const pair<int,int>& b){ return a.first < b.first; });
-                parent.keys.assign(M, -1);
-                parent.refs.assign(M, -1);
-                for(size_t i=0;i<pentries.size() && i<M;i++){
-                    parent.keys[i] = pentries[i].first;
-                    parent.refs[i] = pentries[i].second;
-                }
-
-                if(countKeys(parent) < M){
-                    writeNode(file,parent);
-                } else {
-                    insertIntoInternal(file, parentRRN,maxKeyInNode(newLeaf),newLeaf.selfRRN,path);
-                }
-
-                file.close();
-                return newLeaf.selfRRN;
-            } else {
-                // ROOT WAS LEAF -> root split
-                int leftRRN = allocateFreeNode(file);
-                int rightRRN = allocateFreeNode(file);
-                if(leftRRN==-1||rightRRN==-1){file.close();return -1;}
-
-                BTreeNode leftLeaf;
-                leftLeaf.selfRRN = leftRRN;
-                leftLeaf.status = LEAF_NODE;
-                leftLeaf.keys.assign(M,-1);
-                leftLeaf.refs.assign(M,-1);
-                for(int i=0;i<3;i++){
-                    leftLeaf.keys[i] = entries[i].first;
-                    leftLeaf.refs[i] = entries[i].second;
-                }
-
-                BTreeNode rightLeaf;
-                rightLeaf.selfRRN = rightRRN;
-                rightLeaf.status = LEAF_NODE;
-                rightLeaf.keys.assign(M,-1);
-                rightLeaf.refs.assign(M,-1);
-                for(int i=0;i<3;i++){
-                    rightLeaf.keys[i] = entries[i+3].first;
-                    rightLeaf.refs[i] = entries[i+3].second;
-                }
-
-                writeNode(file,leftLeaf);
-                writeNode(file,rightLeaf);
-
-                BTreeNode newRoot;
-                newRoot.selfRRN = 1;
-                newRoot.status = INTERNAL_NODE;
-                newRoot.keys.assign(M,-1);
-                newRoot.refs.assign(M,-1);
-                newRoot.keys[0] = leftLeaf.keys[2];
-                newRoot.keys[1] = rightLeaf.keys[2];
-                newRoot.refs[0] = leftRRN;
-                newRoot.refs[1] = rightRRN;
-                writeNode(file,newRoot);
-
-                file.close();
-                return 1;
-            }
-        }
-        else {
-            int i=0;
-            while(i<M && node.keys[i]!=-1 && RecordID >= node.keys[i]) i++;
-            current = node.refs[i];
-
-        }
-    }
-
-}
 /// ----------------- Find position of child in parent -----------------
 int findChildPositionInParent(const BTreeNode& parent, int childRRN) {
     for(int i = 0; i < M; i++) {
@@ -416,10 +124,20 @@ void updateParentSeparators(fstream& file,int leafRRN,int deletedKey,const vecto
         if (newMax == -1) return;
 
         // If separator didn't change, stop propagating
-        if (parent.keys[childIndex] == newMax) return;
+        // parent.keys[i] represents max key of subtree at parent.refs[i]
+        if (parent.refs[childIndex] == childRRN) {
+            if (parent.keys[childIndex] != newMax) {
+                parent.keys[childIndex] = newMax;
+                writeNode(file, parent);
+            }
+        }
+        else if (childIndex > 0 && parent.refs[childIndex - 1] == childRRN) {
+            if (parent.keys[childIndex - 1] != newMax) {
+                parent.keys[childIndex - 1] = newMax;
+                writeNode(file, parent);
+            }
+        }
 
-        parent.keys[childIndex] = newMax;
-        writeNode(file, parent);
     }
 }
 
@@ -965,5 +683,4 @@ void DeleteRecordFromIndex(char* filename, int RecordID) {
     file.close();
     cout << "Deletion process completed.\n";
 }
-
 
